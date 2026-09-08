@@ -75,9 +75,14 @@ services:
       - ./flink/lib:/jars:ro
       - ./flink/sql:/opt/flink/sql-changelake:ro
       - ./flink/config/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml.changelake:ro
-      - ./data/warehouse:/warehouse
-      - ./data/checkpoints:/checkpoints
-      - ./data/savepoints:/savepoints
+      # Docker Desktop (WSL2) often breaks Paimon LocalFileIO mkdirs on bind/named volumes.
+      # tmpfs works for local Golden Path; data is ephemeral across compose down.
+      - type: tmpfs
+        target: /warehouse
+      - type: tmpfs
+        target: /checkpoints
+      - type: tmpfs
+        target: /savepoints
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8081/overview >/dev/null || exit 1"]
       interval: 10s
@@ -122,9 +127,14 @@ services:
       - ./flink/lib:/jars:ro
       - ./flink/sql:/opt/flink/sql-changelake:ro
       - ./flink/config/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml.changelake:ro
-      - ./data/warehouse:/warehouse
-      - ./data/checkpoints:/checkpoints
-      - ./data/savepoints:/savepoints
+      # Docker Desktop (WSL2) often breaks Paimon LocalFileIO mkdirs on bind/named volumes.
+      # tmpfs works for local Golden Path; data is ephemeral across compose down.
+      - type: tmpfs
+        target: /warehouse
+      - type: tmpfs
+        target: /checkpoints
+      - type: tmpfs
+        target: /savepoints
     networks:
       - changelake
 
