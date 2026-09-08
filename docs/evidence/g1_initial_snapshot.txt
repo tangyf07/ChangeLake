@@ -1,0 +1,3 @@
+# Stub — filled by scripts/demo_golden_path.sh when G1–G4 are run locally.
+# Case: g1_initial_snapshot
+# Status: NOT RUN in authoring environment (no Docker on build agent).

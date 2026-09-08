@@ -1,5 +1,7 @@
-# ChangeLake Phase 1 — MySQL + Flink JM/TM + Paimon filesystem warehouse
-# No CDC jobs in this phase. Demo credentials only — see README.
+# ChangeLake Phase 2 — MySQL + Flink JM/TM + Paimon filesystem warehouse
+# CDC jars (flink-sql-connector-mysql-cdc + mysql-connector-j) loaded from ./flink/lib
+# via container entrypoint. Pipeline started by scripts/start_pipeline.sh.
+# Demo credentials only — see README.
 
 services:
   mysql:
