@@ -63,8 +63,8 @@ services:
     environment:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 4
-        parallelism.default: 2
+        taskmanager.numberOfTaskSlots: 2
+        parallelism.default: 1
         rest.bind-address: 0.0.0.0
         state.backend: hashmap
         state.checkpoints.dir: file:///checkpoints
@@ -75,14 +75,11 @@ services:
       - ./flink/lib:/jars:ro
       - ./flink/sql:/opt/flink/sql-changelake:ro
       - ./flink/config/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml.changelake:ro
-      # Docker Desktop (WSL2) often breaks Paimon LocalFileIO mkdirs on bind/named volumes.
-      # tmpfs works for local Golden Path; data is ephemeral across compose down.
-      - type: tmpfs
-        target: /warehouse
-      - type: tmpfs
-        target: /checkpoints
-      - type: tmpfs
-        target: /savepoints
+      # Shared bind mounts (JM+TM must see same warehouse). Use parallelism=1 to avoid
+      # Docker Desktop virtiofs mkdir races in Paimon LocalFileIO.
+      - ./data/warehouse:/warehouse
+      - ./data/checkpoints:/checkpoints
+      - ./data/savepoints:/savepoints
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8081/overview >/dev/null || exit 1"]
       interval: 10s
@@ -116,8 +113,8 @@ services:
     environment:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 4
-        parallelism.default: 2
+        taskmanager.numberOfTaskSlots: 2
+        parallelism.default: 1
         state.backend: hashmap
         state.checkpoints.dir: file:///checkpoints
         state.savepoints.dir: file:///savepoints
@@ -127,14 +124,11 @@ services:
       - ./flink/lib:/jars:ro
       - ./flink/sql:/opt/flink/sql-changelake:ro
       - ./flink/config/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml.changelake:ro
-      # Docker Desktop (WSL2) often breaks Paimon LocalFileIO mkdirs on bind/named volumes.
-      # tmpfs works for local Golden Path; data is ephemeral across compose down.
-      - type: tmpfs
-        target: /warehouse
-      - type: tmpfs
-        target: /checkpoints
-      - type: tmpfs
-        target: /savepoints
+      # Shared bind mounts (JM+TM must see same warehouse). Use parallelism=1 to avoid
+      # Docker Desktop virtiofs mkdir races in Paimon LocalFileIO.
+      - ./data/warehouse:/warehouse
+      - ./data/checkpoints:/checkpoints
+      - ./data/savepoints:/savepoints
     networks:
       - changelake
 
