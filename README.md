@@ -15,7 +15,7 @@
 ```text
 ┌────────────┐     ┌─────────────────────┐     ┌──────────────────┐
 │ MySQL 8.0  │     │ Flink 1.18.1 JM/TM  │     │ Paimon warehouse │
-│ changelake │     │ UI :8081            │     │ file:///warehouse│
+│ changelake │     │ UI :FLINK_UI_PORT   │     │ file:///warehouse│
 │ seed=42    │     │ (no CDC job yet)    │     │ catalog stub     │
 └────────────┘     └─────────────────────┘     └──────────────────┘
 ```
@@ -37,14 +37,23 @@ https://paimon.apache.org/docs/1.4/flink/quick-start/
 
 ## Quickstart
 
+推荐（**不依赖 `make`**，WSL / 精简环境可用）：
+
 ```bash
 cp .env.example .env          # demo credentials only
-make jars                     # download Paimon + shaded Hadoop jars
-make up
-make wait
+bash scripts/bootstrap.sh --jars-only
+docker compose up -d
+bash scripts/wait_services.sh
 ```
 
-等价：`bash scripts/bootstrap.sh`
+若已安装 GNU Make，也可：
+
+```bash
+cp .env.example .env
+make jars && make up && make wait
+```
+
+一键：`bash scripts/bootstrap.sh`（含 jars + up + wait）。
 
 ### 验证 MySQL seed
 
@@ -71,7 +80,18 @@ UNION ALL SELECT 'order_items', COUNT(*) FROM changelake.order_items;
 
 ### Flink UI
 
-浏览器打开：**http://localhost:8081**
+默认：**http://localhost:8081**（`.env` 中 `FLINK_UI_PORT`）。
+
+若本机 `8081` 已被占用（常见于其它 Flink / 服务），改端口后再起：
+
+```bash
+# .env
+FLINK_UI_PORT=18081
+docker compose up -d
+# 然后打开 http://localhost:18081
+```
+
+`scripts/wait_services.sh` 会读 `FLINK_UI_PORT`。
 
 ### Paimon catalog stub
 
@@ -86,11 +106,15 @@ Phase 1 仅创建 catalog + `ods`/`dwd`/`ads` database，不建业务表、不�
 ### 常用命令
 
 ```bash
-make down      # 停容器，保留 named volumes
-make reset     # 清空 volumes 后重新 up
-make seed      # 重灌 seed=42
-make status
-make mysql-cli
+# 有 make 时：
+make down / make reset / make seed / make status / make mysql-cli
+
+# 无 make 时：
+docker compose down
+docker compose down -v --remove-orphans && docker compose up -d && bash scripts/wait_services.sh
+bash scripts/seed.sh
+docker compose ps
+docker compose exec mysql mysql -uchangelake -pchangelake changelake
 ```
 
 重新生成 seed SQL：
@@ -117,6 +141,8 @@ python3 scripts/gen_sample_data.py
 - 无 K8s / 多活 HA / 企业级目录
 - **不**声称 Exactly-Once End-to-End 或生产 SLA
 - Phase 1 **无** CDC / Golden Path / Backfill / Reconcile
+- 部分环境（如精简 WSL）可能无 `make`：请用上方 bash / `docker compose` 等价命令
+- 宿主机 `8081` 冲突时设置 `FLINK_UI_PORT`（验收实例曾用 `18081`）
 
 ## Layout
 
