@@ -1,0 +1,22 @@
+# Flink 1.18 cluster config for ChangeLake Phase 1
+jobmanager.rpc.address: jobmanager
+jobmanager.rpc.port: 6123
+jobmanager.memory.process.size: 1600m
+taskmanager.memory.process.size: 1728m
+taskmanager.numberOfTaskSlots: 4
+parallelism.default: 2
+rest.port: 8081
+rest.address: 0.0.0.0
+rest.bind-address: 0.0.0.0
+
+# Checkpoint / savepoint paths (named volumes mounted at these paths)
+state.backend: hashmap
+state.checkpoints.dir: file:///checkpoints
+state.savepoints.dir: file:///savepoints
+execution.checkpointing.interval: 30s
+execution.checkpointing.min-pause: 10s
+execution.checkpointing.timeout: 10min
+execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
+
+# Classloader (needed when loading Paimon JARs from /opt/flink/lib)
+classloader.resolve-order: parent-first

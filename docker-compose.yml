@@ -1,0 +1,134 @@
+# ChangeLake Phase 1 — MySQL + Flink JM/TM + Paimon filesystem warehouse
+# No CDC jobs in this phase. Demo credentials only — see README.
+
+services:
+  mysql:
+    image: mysql:8.0.40
+    container_name: changelake-mysql
+    hostname: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-changelake}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-changelake}
+      MYSQL_USER: ${MYSQL_USER:-changelake}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-changelake}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/mysql/conf.d/changelake.cnf:ro
+      - ./mysql/001_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+      - ./mysql/002_seed.sql:/docker-entrypoint-initdb.d/002_seed.sql:ro
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --binlog-row-image=FULL
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pchangelake"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 25s
+    networks:
+      - changelake
+
+  jobmanager:
+    image: flink:1.18.1-scala_2.12-java17
+    container_name: changelake-jobmanager
+    hostname: jobmanager
+    # Copy optional Paimon/Hadoop jars from ./flink/lib into Flink lib, then start JM.
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        if compgen -G "/jars/*.jar" > /dev/null; then
+          cp -f /jars/*.jar /opt/flink/lib/
+          echo "[changelake] installed jars from /jars into /opt/flink/lib"
+          ls -1 /opt/flink/lib/*paimon* /opt/flink/lib/*hadoop* 2>/dev/null || true
+        else
+          echo "[changelake] no jars in /jars yet (run: make jars)"
+        fi
+        exec /docker-entrypoint.sh jobmanager
+    ports:
+      - "${FLINK_UI_PORT:-8081}:8081"
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 2
+        rest.bind-address: 0.0.0.0
+        state.backend: hashmap
+        state.checkpoints.dir: file:///checkpoints
+        state.savepoints.dir: file:///savepoints
+        execution.checkpointing.interval: 30s
+        classloader.resolve-order: parent-first
+    volumes:
+      - ./flink/lib:/jars:ro
+      - ./flink/sql:/opt/flink/sql-changelake:ro
+      - ./flink/config/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml.changelake:ro
+      - paimon_warehouse:/warehouse
+      - flink_checkpoints:/checkpoints
+      - flink_savepoints:/savepoints
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/overview >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 25s
+    networks:
+      - changelake
+
+  taskmanager:
+    image: flink:1.18.1-scala_2.12-java17
+    container_name: changelake-taskmanager
+    hostname: taskmanager
+    depends_on:
+      jobmanager:
+        condition: service_started
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        if compgen -G "/jars/*.jar" > /dev/null; then
+          cp -f /jars/*.jar /opt/flink/lib/
+          echo "[changelake] installed jars from /jars into /opt/flink/lib"
+        else
+          echo "[changelake] no jars in /jars yet (run: make jars)"
+        fi
+        exec /docker-entrypoint.sh taskmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 2
+        state.backend: hashmap
+        state.checkpoints.dir: file:///checkpoints
+        state.savepoints.dir: file:///savepoints
+        execution.checkpointing.interval: 30s
+        classloader.resolve-order: parent-first
+    volumes:
+      - ./flink/lib:/jars:ro
+      - ./flink/sql:/opt/flink/sql-changelake:ro
+      - ./flink/config/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml.changelake:ro
+      - paimon_warehouse:/warehouse
+      - flink_checkpoints:/checkpoints
+      - flink_savepoints:/savepoints
+    networks:
+      - changelake
+
+volumes:
+  mysql_data:
+    name: changelake_mysql_data
+  paimon_warehouse:
+    name: changelake_paimon_warehouse
+  flink_checkpoints:
+    name: changelake_flink_checkpoints
+  flink_savepoints:
+    name: changelake_flink_savepoints
+
+networks:
+  changelake:
+    name: changelake_net

@@ -1,0 +1,21 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+.DS_Store
+*.log
+.idea/
+.vscode/
+
+# Downloaded Flink/Paimon jars (bootstrap fetches these)
+flink/lib/*.jar
+!flink/lib/.gitkeep
+
+# Local warehouse / checkpoints if bind-mounted for debug
+paimon/warehouse/**
+!paimon/warehouse/.gitkeep
