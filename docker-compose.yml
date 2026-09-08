@@ -75,9 +75,9 @@ services:
       - ./flink/lib:/jars:ro
       - ./flink/sql:/opt/flink/sql-changelake:ro
       - ./flink/config/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml.changelake:ro
-      - paimon_warehouse:/warehouse
-      - flink_checkpoints:/checkpoints
-      - flink_savepoints:/savepoints
+      - ./data/warehouse:/warehouse
+      - ./data/checkpoints:/checkpoints
+      - ./data/savepoints:/savepoints
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8081/overview >/dev/null || exit 1"]
       interval: 10s
@@ -122,21 +122,15 @@ services:
       - ./flink/lib:/jars:ro
       - ./flink/sql:/opt/flink/sql-changelake:ro
       - ./flink/config/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml.changelake:ro
-      - paimon_warehouse:/warehouse
-      - flink_checkpoints:/checkpoints
-      - flink_savepoints:/savepoints
+      - ./data/warehouse:/warehouse
+      - ./data/checkpoints:/checkpoints
+      - ./data/savepoints:/savepoints
     networks:
       - changelake
 
 volumes:
   mysql_data:
     name: changelake_mysql_data
-  paimon_warehouse:
-    name: changelake_paimon_warehouse
-  flink_checkpoints:
-    name: changelake_flink_checkpoints
-  flink_savepoints:
-    name: changelake_flink_savepoints
 
 networks:
   changelake:
