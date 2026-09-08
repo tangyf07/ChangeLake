@@ -47,6 +47,12 @@ sys.exit(0)
   sleep 2
 done
 
+echo "[pipeline] ensuring Paimon catalog exists"
+# Flink SQL does not support CREATE CATALOG IF NOT EXISTS (ParseException on NOT).
+if ! docker compose exec -T jobmanager ./bin/sql-client.sh -e "SHOW CATALOGS;" 2>/dev/null | grep -q paimon; then
+  docker compose exec -T jobmanager ./bin/sql-client.sh -f /opt/flink/sql-changelake/paimon_catalog.sql
+fi
+
 echo "[pipeline] submitting Flink SQL: flink/sql/submit_ods_pipeline.sql"
 # Detached: streaming STATEMENT SET blocks the sql-client session.
 docker compose exec -d jobmanager ./bin/sql-client.sh -f /opt/flink/sql-changelake/submit_ods_pipeline.sql
