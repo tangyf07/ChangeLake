@@ -64,4 +64,4 @@ Local Docker E2E must be run on a machine with Docker; CI does not claim full CD
 
 ## Docker Desktop / WSL2 filesystem note
 
-On Docker Desktop (WSL2), Apache Paimon `LocalFileIO` may fail with `Mkdirs failed to create .../bucket-*` when `/warehouse` is a named volume or host bind mount. Phase 2 compose therefore mounts `/warehouse`, `/checkpoints`, and `/savepoints` as **tmpfs** so Golden Path can run locally. Data does not survive `docker compose down`. Native Linux Docker hosts may switch back to named volumes if preferred.
+On Docker Desktop (WSL2), concurrent Paimon writers can hit `Mkdirs failed to create .../bucket-*` (virtiofs/mkdir races). Phase 2 defaults to **parallelism=1** and **bucket=1**, with shared bind mounts under `./data/`. Native Linux Docker can raise parallelism later.
