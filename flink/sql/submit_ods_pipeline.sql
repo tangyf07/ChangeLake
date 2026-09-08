@@ -8,11 +8,7 @@ SET 'execution.checkpointing.interval' = '30s';
 SET 'table.exec.sink.upsert-materialize' = 'NONE';
 SET 'parallelism.default' = '2';
 
-CREATE CATALOG IF NOT EXISTS paimon WITH (
-  'type' = 'paimon',
-  'warehouse' = 'file:///warehouse'
-);
-
+-- Catalog `paimon` must already exist (scripts/start_pipeline.sh ensures it).
 USE CATALOG paimon;
 CREATE DATABASE IF NOT EXISTS ods;
 
