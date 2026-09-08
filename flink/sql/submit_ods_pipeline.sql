@@ -8,7 +8,12 @@ SET 'execution.checkpointing.interval' = '30s';
 SET 'table.exec.sink.upsert-materialize' = 'NONE';
 SET 'parallelism.default' = '2';
 
--- Catalog `paimon` must already exist (scripts/start_pipeline.sh ensures it).
+-- Session-scoped: CREATE CATALOG every submit (Flink has no IF NOT EXISTS for catalogs).
+CREATE CATALOG paimon WITH (
+  'type' = 'paimon',
+  'warehouse' = 'file:///warehouse'
+);
+
 USE CATALOG paimon;
 CREATE DATABASE IF NOT EXISTS ods;
 
