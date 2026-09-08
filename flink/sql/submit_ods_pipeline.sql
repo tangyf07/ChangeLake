@@ -6,7 +6,7 @@ SET 'pipeline.name' = 'changelake-ods-cdc';
 SET 'execution.runtime-mode' = 'streaming';
 SET 'execution.checkpointing.interval' = '30s';
 SET 'table.exec.sink.upsert-materialize' = 'NONE';
-SET 'parallelism.default' = '2';
+SET 'parallelism.default' = '1';
 
 -- Session-scoped: CREATE CATALOG every submit (Flink has no IF NOT EXISTS for catalogs).
 CREATE CATALOG paimon WITH (
@@ -30,7 +30,7 @@ CREATE TABLE ods.ods_users (
   updated_at TIMESTAMP(0),
   PRIMARY KEY (user_id) NOT ENFORCED
 ) WITH (
-  'bucket' = '2',
+  'bucket' = '1',
   'changelog-producer' = 'input'
 );
 
@@ -43,7 +43,7 @@ CREATE TABLE ods.ods_orders (
   updated_at TIMESTAMP(0),
   PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-  'bucket' = '2',
+  'bucket' = '1',
   'changelog-producer' = 'input'
 );
 
@@ -56,7 +56,7 @@ CREATE TABLE ods.ods_order_items (
   updated_at TIMESTAMP(0),
   PRIMARY KEY (item_id) NOT ENFORCED
 ) WITH (
-  'bucket' = '2',
+  'bucket' = '1',
   'changelog-producer' = 'input'
 );
 
