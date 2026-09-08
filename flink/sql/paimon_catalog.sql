@@ -2,7 +2,7 @@
 -- Docs: https://paimon.apache.org/docs/1.4/flink/quick-start/
 -- Requires: paimon-flink-1.18-1.4.2.jar (+ flink-shaded-hadoop uber) in Flink lib/
 
-CREATE CATALOG IF NOT EXISTS paimon WITH (
+CREATE CATALOG paimon WITH (
   'type' = 'paimon',
   'warehouse' = 'file:///warehouse'
 );
