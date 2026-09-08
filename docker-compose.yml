@@ -49,7 +49,7 @@ services:
       - |
         set -euo pipefail
         mkdir -p /checkpoints /savepoints /warehouse
-        chmod -R a+rwX /checkpoints /savepoints /warehouse || true
+        chmod -R 777 /checkpoints /savepoints /warehouse || true
         if compgen -G "/jars/*.jar" > /dev/null; then
           cp -f /jars/*.jar /opt/flink/lib/
           echo "[changelake] installed jars from /jars into /opt/flink/lib"
@@ -100,7 +100,7 @@ services:
       - |
         set -euo pipefail
         mkdir -p /checkpoints /savepoints /warehouse
-        chmod -R a+rwX /checkpoints /savepoints /warehouse || true
+        chmod -R 777 /checkpoints /savepoints /warehouse || true
         if compgen -G "/jars/*.jar" > /dev/null; then
           cp -f /jars/*.jar /opt/flink/lib/
           echo "[changelake] installed jars from /jars into /opt/flink/lib"
