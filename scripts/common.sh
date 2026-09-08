@@ -97,7 +97,8 @@ paimon_sql() {
     cat <<'HDR'
 SET 'execution.runtime-mode' = 'batch';
 SET 'sql-client.execution.result-mode' = 'plain';
-CREATE CATALOG IF NOT EXISTS paimon WITH (
+-- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+CREATE CATALOG paimon WITH (
   'type' = 'paimon',
   'warehouse' = 'file:///warehouse'
 );
