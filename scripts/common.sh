@@ -96,7 +96,7 @@ paimon_sql() {
   {
     cat <<'HDR'
 SET 'execution.runtime-mode' = 'batch';
-SET 'sql-client.execution.result-mode' = 'plain';
+SET 'sql-client.execution.result-mode' = 'tableau';
 -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
 CREATE CATALOG paimon WITH (
   'type' = 'paimon',
@@ -114,16 +114,31 @@ HDR
     rm -f "$tmp" "$sql_file"
     return "$rc"
   fi
+  if grep -q '\[ERROR\]' "$tmp"; then
+    echo "[common] paimon_sql statement error:" >&2
+    cat "$tmp" >&2
+    rm -f "$tmp" "$sql_file"
+    return 1
+  fi
   cat "$tmp"
   rm -f "$tmp" "$sql_file"
 }
 
 extract_plain_scalar() {
-  awk '
-    /^[[:space:]]*[0-9]+([.][0-9]+)?[[:space:]]*$/ { v=$1 }
-    END { if (v != "") print v; else exit 1 }
-  '
+  # Tableau rows look like: | 20 |  or | 199.99 |
+  python3 -c "import re,sys
+text=sys.stdin.read(); vals=[]
+for line in text.splitlines():
+    if '|' not in line: continue
+    s=line.strip()
+    if set(s)<=set('+-| '): continue
+    low=s.lower()
+    if 'row' in low and 'set' in low: continue
+    for p in [x.strip() for x in line.split('|') if x.strip()!='']:
+        if re.fullmatch(r'-?\\d+(\\.\\d+)?', p): vals.append(p)
+print(vals[-1]) if vals else sys.exit(1)"
 }
+
 
 ods_count() {
   local table="$1"
