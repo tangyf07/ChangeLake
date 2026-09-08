@@ -61,3 +61,7 @@ Local Docker E2E must be run on a machine with Docker; CI does not claim full CD
 - If `Bind for 0.0.0.0:8081 failed`: set `FLINK_UI_PORT=18081` (or free port) in `.env`, then `docker compose up -d`.
 - After downloading new jars, restart JM/TM so `/jars` is copied into `/opt/flink/lib` (`start_pipeline.sh` does this when CDC jar is missing inside the container).
 - No `make`? Use the bash equivalents in README Quickstart.
+
+## Docker Desktop / WSL2 filesystem note
+
+On Docker Desktop (WSL2), Apache Paimon `LocalFileIO` may fail with `Mkdirs failed to create .../bucket-*` when `/warehouse` is a named volume or host bind mount. Phase 2 compose therefore mounts `/warehouse`, `/checkpoints`, and `/savepoints` as **tmpfs** so Golden Path can run locally. Data does not survive `docker compose down`. Native Linux Docker hosts may switch back to named volumes if preferred.
