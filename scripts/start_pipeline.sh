@@ -49,10 +49,12 @@ sys.exit(0)
   sleep 2
 done
 
-echo "[pipeline] ensuring Paimon catalog exists"
-# Flink SQL does not support CREATE CATALOG IF NOT EXISTS (ParseException on NOT).
-if ! docker compose exec -T jobmanager ./bin/sql-client.sh -e "SHOW CATALOGS;" 2>/dev/null | grep -q paimon; then
-  docker compose exec -T jobmanager ./bin/sql-client.sh -f /opt/flink/sql-changelake/paimon_catalog.sql
+echo "[pipeline] ensuring Paimon catalog DDL is reachable (session-scoped; no SHOW CATALOGS — sql-client -e can hang)"
+# Catalogs are session-scoped: a fresh sql-client never sees another session's catalog.
+# submit_ods_pipeline.sql (and peers) CREATE CATALOG in-session. Keep a timed -f smoke only.
+if ! timeout 90s docker compose exec -T jobmanager ./bin/sql-client.sh -f /opt/flink/sql-changelake/paimon_catalog.sql >/tmp/changelake_catalog_smoke.out 2>&1; then
+  echo "[pipeline] WARN: catalog smoke timed out/failed; continuing — submit SQL creates catalog in-session" >&2
+  tail -n 40 /tmp/changelake_catalog_smoke.out >&2 || true
 fi
 
 echo "[pipeline] submitting Flink SQL: flink/sql/submit_ods_pipeline.sql"
