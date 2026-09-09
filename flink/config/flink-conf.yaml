@@ -1,9 +1,10 @@
-# Flink 1.18 cluster config for ChangeLake Phase 4 (G6 recovery)
+# Flink 1.18 cluster config for ChangeLake Phase 5 (G6 recovery + DWD/ADS)
+# Task slots ≥10 so ODS + DWD + ADS batch + sql-client collect can schedule together.
 jobmanager.rpc.address: jobmanager
 jobmanager.rpc.port: 6123
 jobmanager.memory.process.size: 1600m
 taskmanager.memory.process.size: 1728m
-taskmanager.numberOfTaskSlots: 4
+taskmanager.numberOfTaskSlots: 10
 parallelism.default: 2
 rest.port: 8081
 rest.address: 0.0.0.0

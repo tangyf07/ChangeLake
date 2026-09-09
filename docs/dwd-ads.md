@@ -57,10 +57,29 @@ Aligned with seed statuses (`created` / `cancelled` / `refunded` are **not** pai
 
 | Job | SQL | Mode |
 | --- | --- | --- |
-| `changelake-dwd-orders` | `flink/sql/submit_dwd_pipeline.sql` | **streaming** ODS → DWD |
-| `changelake-ads-order-daily` | `flink/sql/submit_ads_pipeline.sql` | **batch** `INSERT OVERWRITE` DWD → ADS |
+| `changelake-dwd-orders` | `flink/sql/submit_dwd_pipeline.sql` | **streaming** ODS → DWD (`scan.mode=latest-full`, checkpoint **10s**) |
+| `changelake-ads-order-daily` | `flink/sql/submit_ads_pipeline.sql` | **batch** `INSERT OVERWRITE` DWD → ADS (`execution.runtime-mode=batch`) |
+
+### Submit order (`scripts/start_dwd_ads.sh`)
+
+1. Cancel any prior DWD / stuck ADS jobs (free TaskManager slots).
+2. Submit **DWD** streaming job; wait until **RUNNING**.
+3. Wait until DWD has **≥1 completed checkpoint** (Paimon sink commit), then poll `COUNT(*)` on `dwd.dwd_orders`.
+4. Only then submit **ADS** batch `INSERT OVERWRITE`; wait until job state is **FINISHED** (not left `SCHEDULED`).
 
 ADS uses a **bounded batch refresh** for Phase 5 correctness on Flink 1.18.1 + Paimon 1.4.2. Streaming continuous aggregation is **not** claimed.
+
+### TaskManager slots
+
+`taskmanager.numberOfTaskSlots: **10**` in `docker-compose.yml` `FLINK_PROPERTIES` (JM + TM) and `flink/config/flink-conf.yaml`.
+
+Needed so **ODS** (≈6 tasks) + **DWD** (≈2) + **ADS** batch (1) + **sql-client collect** (1–2) can schedule together. With only 2 slots, ADS / verify `SELECT` stay `SCHEDULED` forever (slot starvation) while ODS+DWD hold the cluster.
+
+After changing slots, recreate the TaskManager (and preferably JobManager) so the new value applies:
+
+```bash
+docker compose up -d --force-recreate taskmanager jobmanager
+```
 
 Catalog SQL follows existing patterns: session `CREATE CATALOG` (no `IF NOT EXISTS`), MinIO `s3://changelake/warehouse`, result-mode tableau for checks.
 
@@ -68,6 +87,7 @@ Catalog SQL follows existing patterns: session `CREATE CATALOG` (no `IF NOT EXIS
 
 ```bash
 # Prereq: stack up, smoke_storage PASS, ODS preferably evolved (channel present)
+# Slots must be 10 (recreate JM/TM after pulling this change)
 bash scripts/start_pipeline.sh
 bash scripts/schema_evolution.sh   # if channel not yet on ODS
 bash scripts/verify_dwd_ads.sh     # or: make dwd-ads

@@ -3,10 +3,12 @@
 -- Requires ods.ods_orders with channel column (post-G5 / evolved ODS).
 -- coupon_amount not in ODS → CAST(NULL AS DECIMAL(12,2)); net_amount = amount.
 -- Pre-G5 rows with NULL channel are preserved as NULL in DWD (ADS maps to 'unknown').
+-- Source hint scan.mode=latest-full: emit current ODS snapshot then continue with changelog.
+-- Checkpoint interval 10s matches cluster conf (faster DWD commit visibility before ADS).
 
 SET 'pipeline.name' = 'changelake-dwd-orders';
 SET 'execution.runtime-mode' = 'streaming';
-SET 'execution.checkpointing.interval' = '30s';
+SET 'execution.checkpointing.interval' = '10s';
 SET 'table.exec.sink.upsert-materialize' = 'NONE';
 SET 'parallelism.default' = '1';
 
@@ -52,4 +54,4 @@ SELECT
   amount AS net_amount,
   order_ts,
   updated_at
-FROM ods.ods_orders;
+FROM ods.ods_orders /*+ OPTIONS('scan.mode'='latest-full') */;

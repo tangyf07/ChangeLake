@@ -119,6 +119,8 @@ bash scripts/failure_recovery.sh
 
 需 ODS 已有 `channel`（先跑 G5 / `schema_evolution.sh`）。校验脚本会尽量自启 ODS 并触发演进。
 
+Flink `taskmanager.numberOfTaskSlots=10`（`docker-compose.yml` `FLINK_PROPERTIES`）。改完后需 `docker compose up -d --force-recreate taskmanager jobmanager`。提交顺序：DWD → ≥1 checkpoint → ADS batch `FINISHED`。
+
 ```bash
 bash scripts/verify_dwd_ads.sh
 # 或: make dwd-ads

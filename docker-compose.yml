@@ -1,4 +1,5 @@
-# ChangeLake Phase 4 — MySQL + Flink JM/TM + MinIO (Paimon S3 warehouse)
+# ChangeLake Phase 5 — MySQL + Flink JM/TM + MinIO (Paimon S3 warehouse)
+# Task slots=10: ODS(6 tasks) + DWD(2) + ADS batch(1) + sql-client collect(1–2)
 # G6: TM kill + checkpoint restore (named volume /checkpoints; JM user 0)
 # CDC jars (flink-sql-connector-mysql-cdc + mysql-connector-j + paimon-s3) from ./flink/lib
 # via container entrypoint. Pipeline started by scripts/start_pipeline.sh.
@@ -121,7 +122,7 @@ services:
       PAIMON_WAREHOUSE: ${PAIMON_WAREHOUSE:-s3://changelake/warehouse}
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 2
+        taskmanager.numberOfTaskSlots: 10
         parallelism.default: 1
         rest.bind-address: 0.0.0.0
         state.backend: hashmap
@@ -182,7 +183,7 @@ services:
       PAIMON_WAREHOUSE: ${PAIMON_WAREHOUSE:-s3://changelake/warehouse}
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 2
+        taskmanager.numberOfTaskSlots: 10
         parallelism.default: 1
         state.backend: hashmap
         state.checkpoints.dir: file:///checkpoints

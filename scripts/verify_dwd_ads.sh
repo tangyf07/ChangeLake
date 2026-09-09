@@ -2,6 +2,8 @@
 # Phase 5 verification: DWD net_amount + ADS daily metrics vs MySQL-derived expectations.
 # Writes docs/evidence/dwd_ads.txt and prints [DWD/ADS] PASS on success.
 # Exit 2 on hard fail (matches golden-path style).
+# Relies on start_dwd_ads.sh order: DWD → ≥1 checkpoint → ADS batch FINISHED.
+# Needs taskmanager.numberOfTaskSlots≥10 so ODS+DWD+ADS+sql-client collect can schedule.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -13,6 +15,7 @@ EVIDENCE_FILE="$EVIDENCE_DIR/dwd_ads.txt"
 mkdir -p "$EVIDENCE_DIR"
 
 DWD_JOB_NAME="${DWD_JOB_NAME:-changelake-dwd-orders}"
+ADS_JOB_NAME="${ADS_JOB_NAME:-changelake-ads-order-daily}"
 # Default check date: a seed day with multiple orders (2026-08-02 has orders 1 & 29)
 CHECK_DT="${CHECK_DT:-2026-08-02}"
 # Paid status set (documented): paid + shipped + completed
@@ -61,6 +64,9 @@ echo "[dwd-ads] submitting DWD + ADS via start_dwd_ads.sh"
 bash "$ROOT/scripts/start_dwd_ads.sh"
 
 # ---- 3) Wait for DWD rows ----
+# If a prior ADS batch is stuck SCHEDULED (slot starvation), cancel it so paimon_sql collect can run.
+cancel_flink_jobs "$ADS_JOB_NAME" || true
+
 wait_dwd_rows() {
   local cnt
   cnt="$(paimon_sql <<'SQL' | extract_plain_scalar
@@ -103,10 +109,35 @@ echo "$dwd_sample" | grep -qE '1' || fail "order_id=1 missing in DWD"
 
 # ---- 4) Ensure ADS refreshed (re-run batch for determinism) ----
 echo "[dwd-ads] refreshing ADS batch (submit_ads_pipeline.sql)"
+cancel_flink_jobs "$ADS_JOB_NAME" || true
+sleep 2
 if ! docker compose exec -T jobmanager ./bin/sql-client.sh -f /opt/flink/sql-changelake/submit_ads_pipeline.sql; then
   fail "ADS batch submit failed"
 fi
-sleep 3
+
+# ADS must reach FINISHED (batch mode); do not leave SCHEDULED forever under slot pressure
+ads_finished=0
+deadline=$((SECONDS + CDC_WAIT_TIMEOUT))
+echo "[dwd-ads] waiting for ADS job FINISHED (timeout=${CDC_WAIT_TIMEOUT}s)"
+while (( SECONDS < deadline )); do
+  if python3 -c "
+import json, urllib.request, sys
+ui, needle = sys.argv[1], sys.argv[2]
+data = json.load(urllib.request.urlopen(ui + '/jobs/overview', timeout=10))
+jobs = [j for j in data.get('jobs', []) if needle in (j.get('name') or '')]
+states = [(j.get('state') or '').upper() for j in jobs]
+print('ADS states=' + ','.join(states) if states else 'ADS states=<none>')
+sys.exit(0 if any(s == 'FINISHED' for s in states) else 1)
+" "$(flink_ui)" "$ADS_JOB_NAME"; then
+    ads_finished=1
+    break
+  fi
+  sleep 3
+done
+if (( ads_finished != 1 )); then
+  cancel_flink_jobs "$ADS_JOB_NAME" || true
+  fail "ADS batch did not reach FINISHED (check taskmanager.numberOfTaskSlots≥10)"
+fi
 
 wait_ads_rows() {
   local cnt

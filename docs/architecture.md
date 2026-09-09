@@ -72,8 +72,12 @@ See [`failure-recovery.md`](failure-recovery.md). **Not** an EO-2PC claim.
 
 Streaming **ODS → DWD** (`changelake-dwd-orders`) freezes order-grain business fields
 (`net_amount = amount` while `coupon_amount` is absent; NULL `channel` tolerated).
+DWD source uses Paimon `scan.mode=latest-full`; checkpoint interval **10s**.
 
 **ADS** `ads.ads_order_daily` is refreshed with a **batch** `INSERT OVERWRITE` from DWD
-(dimensions `dt` + `channel` with NULL → literal `unknown`). See [`dwd-ads.md`](dwd-ads.md).
+(dimensions `dt` + `channel` with NULL → literal `unknown`) **only after** DWD has ≥1
+completed checkpoint (committed rows). See [`dwd-ads.md`](dwd-ads.md).
+
+Flink `taskmanager.numberOfTaskSlots=10` so ODS + DWD + ADS + sql-client collect fit.
 
 G7–G10 / Phase 6+ remain unimplemented. **Not** an EO-2PC claim.

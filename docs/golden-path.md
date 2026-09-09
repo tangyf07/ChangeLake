@@ -15,7 +15,7 @@ Standalone Phase 5 check: `bash scripts/verify_dwd_ads.sh` / `make dwd-ads`.
 | G4 | `mysql/mutations/delete.sql` | Current-state query empty for `900001` |
 | G5 | `schema_evolution.sh` + DML | ADD `channel`; pipeline RUNNING; `1→app`, `900002→web`, `2→NULL` |
 | G6 | `failure_recovery.sh` | ≥1 checkpoint → TM kill → restore → Paimon == MySQL (`3`, `900003`) |
-| P5 | `verify_dwd_ads.sh` | DWD `net_amount` + ADS daily metrics vs MySQL for a known `dt` |
+| P5 | `verify_dwd_ads.sh` | DWD `net_amount` + ADS daily metrics vs MySQL for a known `dt` (needs **10** TM slots; DWD checkpoint before ADS) |
 
 Hard failure → print `FAIL`, write partial evidence if any, `exit 2`. Never WARNING-and-continue.
 
