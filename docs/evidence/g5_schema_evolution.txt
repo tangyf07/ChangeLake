@@ -1,17 +1,122 @@
-G5 Schema Evolution — evidence stub
-Status: NOT RUN on this commit authoring host (no Docker E2E here).
-Fill by local run:
+G5 Schema Evolution ADD COLUMN channel
+mode=explicit_migration (Flink SQL mysql-cdc fixed schema; see docs/schema-evolution.md)
+MySQL ALTER while pipeline RUNNING → Paimon ALTER ADD → resubmit evolved SQL
+order_id=1 channel=app:
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 5:14:11 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[34;1m[INFO] Executing SQL from file.[0m
 
-  bash scripts/smoke_storage.sh
-  bash scripts/demo_golden_path.sh
+Command history file path: /root/.flink-sql-history
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
 
-Expect the demo script to overwrite this file with:
-  - MySQL ALTER ADD COLUMN channel while pipeline RUNNING
-  - Paimon ALTER ADD channel + evolved job resubmit
-  - order_id=1 channel=app
-  - order_id=2 channel=NULL
-  - order_id=900002 channel=web
-  - pipeline=RUNNING
-  - PASS
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
 
-Mode: explicit_migration (Flink SQL mysql-cdc fixed schema; see docs/schema-evolution.md)
+Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+> -- Warehouse: MinIO S3 (not local file:///).
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> SELECT order_id, user_id, status, CAST(amount AS STRING) AS amount,
+>        CAST(channel AS STRING)+----------+---------+--------+--------+---------+
+| order_id | user_id | status | amount | channel |
++----------+---------+--------+--------+---------+
+|        1 |      10 |   paid | 110.00 |     app |
++----------+---------+--------+--------+---------+
+1 row in set
+
+Flink SQL> 
+Shutting down the session...
+done.
+order_id=2 channel=NULL:
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 5:14:18 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[34;1m[INFO] Executing SQL from file.[0m
+
+Command history file path: /root/.flink-sql-history
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+> -- Warehouse: MinIO S3 (not local file:///).
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> SELECT order_id, user_id, status, CAST(amount AS STRING) AS amount,
+>        CAST(channel AS STRING)+----------+---------+---------+--------+---------+
+| order_id | user_id |  status | amount | channel |
++----------+---------+---------+--------+---------+
+|        2 |      17 | shipped | 222.50 |  <NULL> |
++----------+---------+---------+--------+---------+
+1 row in set
+
+Flink SQL> 
+Shutting down the session...
+done.
+order_id=900002 channel=web:
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 5:14:24 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[34;1m[INFO] Executing SQL from file.[0m
+
+Command history file path: /root/.flink-sql-history
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+> -- Warehouse: MinIO S3 (not local file:///).
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> SELECT order_id, user_id, status, CAST(amount AS STRING) AS amount,
+>        CAST(channel AS STRING)+----------+---------+---------+--------+---------+
+| order_id | user_id |  status | amount | channel |
++----------+---------+---------+--------+---------+
+|   900002 |       2 | created |  55.00 |     web |
++----------+---------+---------+--------+---------+
+1 row in set
+
+Flink SQL> 
+Shutting down the session...
+done.
+pipeline=RUNNING
+PASS

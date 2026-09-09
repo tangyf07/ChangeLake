@@ -1,42 +1,116 @@
-# ChangeLake Phase 2 evidence
-# Host: WSL Docker on tangyf
-# Branch: phase-2-cdc @ 72e5fb7168f1b5430816c864e8a27c262e9ca4c7
-# Date: 2026-09-09 (Asia/Shanghai)
-# Commands: bash scripts/smoke_storage.sh ; bash scripts/demo_golden_path.sh
-# Result: smoke PASS; G1–G4 ALL PASS; DEMO_EXIT=0
+G1 Initial Snapshot
+source.users=20 lake.ods_users=20
+source.orders=50 lake.ods_orders=50
+source.order_items=85 lake.ods_order_items=85
+spot users: WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 5:11:30 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[34;1m[INFO] Executing SQL from file.[0m
 
-==================================================
-[G1] Initial Snapshot
-==================================================
-[wait] ODS counts == MySQL (20/50/85) (timeout=180s)
- changelake-jobmanager Copying /tmp/tmp.iKHbi3do7w to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.iKHbi3do7w to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copying /tmp/tmp.wcPGTiPRHb to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.wcPGTiPRHb to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copying /tmp/tmp.6KV2tPbTog to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.6KV2tPbTog to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copying /tmp/tmp.9RDtHWpanQ to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.9RDtHWpanQ to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copying /tmp/tmp.BY1EeIDemp to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.BY1EeIDemp to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copying /tmp/tmp.0PLDaaorun to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.0PLDaaorun to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copying /tmp/tmp.pDxv27QYIl to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.pDxv27QYIl to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copying /tmp/tmp.TaEasGakmO to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.TaEasGakmO to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copying /tmp/tmp.TeS4pWrUFe to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.TeS4pWrUFe to changelake-jobmanager:/tmp/changelake_query.sql
-source.users           = 20
-lake.ods_users         = 20
-source.orders          = 50
-lake.ods_orders        = 50
-source.order_items     = 85
-lake.ods_order_items   = 85
- changelake-jobmanager Copying /tmp/tmp.dwn1K9TOWj to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.dwn1K9TOWj to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copying /tmp/tmp.3QgamHGN7q to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.3QgamHGN7q to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copying /tmp/tmp.AUMM8EvSNV to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.AUMM8EvSNV to changelake-jobmanager:/tmp/changelake_query.sql
-[G1] PASS initial snapshot
+Command history file path: /root/.flink-sql-history
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+> -- Warehouse: MinIO S3 (not local file:///).
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> +---------+----------+----------+
+| user_id | username |     city |
++---------+----------+----------+
+|       1 | user_001 | Hangzhou |
++---------+----------+----------+
+1 row in set
+
+Flink SQL> 
+Shutting down the session...
+done.
+spot orders: WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 5:11:36 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[34;1m[INFO] Executing SQL from file.[0m
+
+Command history file path: /root/.flink-sql-history
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+> -- Warehouse: MinIO S3 (not local file:///).
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> SELECT order_id, user_id, status, CAST(amount AS STRING)+----------+---------+--------+--------+
+| order_id | user_id | status | EXPR$3 |
++----------+---------+--------+--------+
+|        1 |      10 |   paid | 110.00 |
++----------+---------+--------+--------+
+1 row in set
+
+Flink SQL> 
+Shutting down the session...
+done.
+spot items: WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 5:11:44 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[34;1m[INFO] Executing SQL from file.[0m
+
+Command history file path: /root/.flink-sql-history
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+> -- Warehouse: MinIO S3 (not local file:///).
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> +---------+----------+------------+-----+
+| item_id | order_id | product_id | qty |
++---------+----------+------------+-----+
+|       1 |        1 |         18 |   2 |
++---------+----------+------------+-----+
+1 row in set
+
+Flink SQL> 
+Shutting down the session...
+done.
+PASS
