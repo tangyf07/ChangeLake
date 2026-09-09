@@ -1,0 +1,12 @@
+Phase 4 local verify (WSL Docker) @ 2026-09-09 Asia/Shanghai
+SHA under test: dbf7d03f69c5bfa9e431d54bd2b51c1a9d7b847b (phase-4-recovery zip)
+FLINK_UI_PORT=18081
+
+Results:
+- demo_golden_path G1–G6: ALL PASS (DEMO_EXIT=0)
+- G6: completed_checkpoints=2 → failure_recovery_pre.sql → docker kill changelake-taskmanager → compose up taskmanager → same jid → post mutations → Paimon==MySQL for order_id=3 (shipped/302.22) and 900003 (shipped/88.88)
+- checkpoint: file:///checkpoints interval=10s hashmap + fixed-delay restart
+- smoke_storage: cold SMOKE_EXIT=2 (probe row); non-blocking D1; Phase 4 gate is G6 demo
+
+Evidence: docs/evidence/g1_*.txt … g6_failure_recovery.txt (this commit)
+NOT claimed: EO-2PC / Exactly-Once E2E

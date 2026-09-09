@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ChangeLake Phase 3 Golden Path: G1–G5 (snapshot / insert / update / delete / schema evolution).
+# ChangeLake Phase 4 Golden Path: G1–G6 (+ failure recovery / TM kill + checkpoint restore).
 # Output format: spec §22. Hard fail → exit 2 (never WARNING-and-continue).
 set -euo pipefail
 
@@ -15,6 +15,7 @@ G2_STATUS=PENDING
 G3_STATUS=PENDING
 G4_STATUS=PENDING
 G5_STATUS=PENDING
+G6_STATUS=PENDING
 
 fail_case() {
   local id="$1"
@@ -28,6 +29,7 @@ fail_case() {
     G3) G3_STATUS=FAIL ;;
     G4) G4_STATUS=FAIL ;;
     G5) G5_STATUS=FAIL ;;
+    G6) G6_STATUS=FAIL ;;
   esac
   print_summary
   exit 2
@@ -43,6 +45,7 @@ pass_case() {
     G3) G3_STATUS=PASS ;;
     G4) G4_STATUS=PASS ;;
     G5) G5_STATUS=PASS ;;
+    G6) G6_STATUS=PASS ;;
   esac
 }
 
@@ -50,7 +53,7 @@ print_summary() {
   cat <<SUM
 
 ==================================================
-ChangeLake Golden Path (Phase 3: G1–G5)
+ChangeLake Golden Path (Phase 4: G1–G6)
 ==================================================
 
 G1  Initial Snapshot       ${G1_STATUS}
@@ -58,10 +61,11 @@ G2  Insert                 ${G2_STATUS}
 G3  Update                 ${G3_STATUS}
 G4  Delete                 ${G4_STATUS}
 G5  Schema Evolution       ${G5_STATUS}
+G6  Failure Recovery       ${G6_STATUS}
 
 SUM
-  if [[ "$G1_STATUS" == PASS && "$G2_STATUS" == PASS && "$G3_STATUS" == PASS && "$G4_STATUS" == PASS && "$G5_STATUS" == PASS ]]; then
-    echo "ALL PASS (G1–G5)"
+  if [[ "$G1_STATUS" == PASS && "$G2_STATUS" == PASS && "$G3_STATUS" == PASS && "$G4_STATUS" == PASS && "$G5_STATUS" == PASS && "$G6_STATUS" == PASS ]]; then
+    echo "ALL PASS (G1–G6)"
   else
     echo "FAILED"
   fi
@@ -85,7 +89,7 @@ wait_until() {
 }
 
 # --- Preconditions ---
-echo "[demo] ChangeLake Phase 3 Golden Path G1–G5"
+echo "[demo] ChangeLake Phase 4 Golden Path G1–G6"
 echo "[demo] Flink UI port: ${FLINK_UI_PORT} → $(flink_ui)"
 bash "$ROOT/scripts/wait_services.sh"
 
@@ -95,7 +99,7 @@ mysql_drop_orders_channel_if_exists
 # Clean MySQL mutation residue + re-seed deterministic baseline
 echo "[demo] re-seed MySQL (seed=42) and ensure order 900001/900002 absent"
 bash "$ROOT/scripts/seed.sh"
-mysql_exec -e "DELETE FROM orders WHERE order_id IN (900001, 900002);" >/dev/null || true
+mysql_exec -e "DELETE FROM orders WHERE order_id IN (900001, 900002, 900003);" >/dev/null || true
 
 SRC_USERS="$(mysql_scalar "SELECT COUNT(*) FROM changelake.users;")"
 SRC_ORDERS="$(mysql_scalar "SELECT COUNT(*) FROM changelake.orders;")"
@@ -372,6 +376,24 @@ echo "order_id=900002: $G5_NEW"
 } >"$EVIDENCE_DIR/g5_schema_evolution.txt"
 
 pass_case G5 "schema evolution"
+
+# ==================================================
+# G6 Failure Recovery
+# ==================================================
+echo
+echo "=================================================="
+echo "[G6] Failure Recovery"
+echo "=================================================="
+
+if ! flink_job_is_running "$PIPELINE_JOB_NAME"; then
+  fail_case G6 "failure recovery" "pipeline not RUNNING before G6"
+fi
+
+if ! bash "$ROOT/scripts/failure_recovery.sh"; then
+  fail_case G6 "failure recovery" "see scripts/failure_recovery.sh / docs/evidence/g6_failure_recovery.txt"
+fi
+
+pass_case G6 "failure recovery"
 
 print_summary
 exit 0

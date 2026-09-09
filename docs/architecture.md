@@ -1,4 +1,4 @@
-# Architecture (Phase 3)
+# Architecture (Phase 4)
 
 ```text
 ┌──────────────────┐
@@ -8,7 +8,7 @@
          │ mysql-cdc 3.1.1 (server-id ranges 5401–5412)
          ▼
 ┌──────────────────┐
-│ Flink 1.18.1     │  JM + TM, checkpoint every 30s
+│ Flink 1.18.1     │  JM + TM, checkpoint every 10s (G6)
 │ SQL STATEMENT SET│  job name: changelake-ods-cdc
 └────────┬─────────┘
          │ PK upsert (changelog-producer=input)
@@ -54,3 +54,13 @@ resubmit `submit_ods_pipeline_evolved.sql` (does not DROP ODS).
 
 Flink SQL `mysql-cdc` does not transparently expand table schemas at runtime; see
 [`schema-evolution.md`](schema-evolution.md).
+
+
+## Failure recovery (Phase 4)
+
+G6 kills `changelake-taskmanager` after ≥1 completed checkpoint on named volume
+`changelake_flink_checkpoints` (`file:///checkpoints`). JobManager stays up;
+`restart-strategy.type: fixed-delay` brings the job back to RUNNING from the last
+checkpoint; mysql-cdc resumes from stored offsets; Paimon PK ODS converges to MySQL.
+
+See [`failure-recovery.md`](failure-recovery.md). **Not** an EO-2PC claim.

@@ -1,13 +1,18 @@
-G1 Initial Snapshot
-source.users=20 lake.ods_users=20
-source.orders=50 lake.ods_orders=50
-source.order_items=85 lake.ods_order_items=85
-spot users: WARNING: Unknown module: jdk.compiler specified to --add-exports
+G6 Failure Recovery
+checkpoint_dir=file:///checkpoints interval=10s backend=hashmap
+restart-strategy=fixed-delay attempts=10 delay=5s
+pre_kill_completed_checkpoints=2
+pre_kill_job_id=41c8e0f3cc2493a9887e3c2d606fa04b
+post_restore_job_id=41c8e0f3cc2493a9887e3c2d606fa04b
+fault=docker kill changelake-taskmanager → docker compose up -d taskmanager
+mysql order 3=3:shipped:302.22
+lake order 3:
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
-Sep 09, 2026 5:29:59 AM org.jline.utils.Log logr
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 5:34:27 AM org.jline.utils.Log logr
 WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
 [34;1m[INFO] Executing SQL from file.[0m
 
@@ -29,22 +34,24 @@ Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scop
 
 Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
 
-Flink SQL> +---------+----------+----------+
-| user_id | username |     city |
-+---------+----------+----------+
-|       1 | user_001 | Hangzhou |
-+---------+----------+----------+
+Flink SQL> SELECT order_id, user_id, status, CAST(amount AS STRING)+----------+---------+---------+--------+
+| order_id | user_id |  status | amount |
++----------+---------+---------+--------+
+|        3 |       4 | shipped | 302.22 |
++----------+---------+---------+--------+
 1 row in set
 
 Flink SQL> 
 Shutting down the session...
 done.
-spot orders: WARNING: Unknown module: jdk.compiler specified to --add-exports
+mysql order 900003=900003:shipped:88.88
+lake order 900003:
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
-Sep 09, 2026 5:30:05 AM org.jline.utils.Log logr
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 5:34:33 AM org.jline.utils.Log logr
 WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
 [34;1m[INFO] Executing SQL from file.[0m
 
@@ -66,51 +73,15 @@ Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scop
 
 Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
 
-Flink SQL> SELECT order_id, user_id, status, CAST(amount AS STRING)+----------+---------+--------+--------+
-| order_id | user_id | status | EXPR$3 |
-+----------+---------+--------+--------+
-|        1 |      10 |   paid | 110.00 |
-+----------+---------+--------+--------+
+Flink SQL> SELECT order_id, user_id, status, CAST(amount AS STRING)+----------+---------+---------+--------+
+| order_id | user_id |  status | amount |
++----------+---------+---------+--------+
+|   900003 |       1 | shipped |  88.88 |
++----------+---------+---------+--------+
 1 row in set
 
 Flink SQL> 
 Shutting down the session...
 done.
-spot items: WARNING: Unknown module: jdk.compiler specified to --add-exports
-WARNING: Unknown module: jdk.compiler specified to --add-exports
-WARNING: Unknown module: jdk.compiler specified to --add-exports
-WARNING: Unknown module: jdk.compiler specified to --add-exports
-WARNING: Unknown module: jdk.compiler specified to --add-exports
-Sep 09, 2026 5:30:12 AM org.jline.utils.Log logr
-WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
-[34;1m[INFO] Executing SQL from file.[0m
-
-Command history file path: /root/.flink-sql-history
-Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
-
-Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
-
-Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
-> -- Warehouse: MinIO S3 (not local file:///).
-> CREATE CATALOG paimon WITH (
->   'type' = 'paimon',
->   'warehouse' = 's3://changelake/warehouse',
->   's3.endpoint' = 'http://minio:9000',
->   's3.access-key' = 'minioadmin',
->   's3.secret-key' = 'minioadmin',
->   's3.path.style.access' = 'true'
-> )[34;1m[INFO] Execute statement succeed.[0m
-
-Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
-
-Flink SQL> +---------+----------+------------+-----+
-| item_id | order_id | product_id | qty |
-+---------+----------+------------+-----+
-|       1 |        1 |         18 |   2 |
-+---------+----------+------------+-----+
-1 row in set
-
-Flink SQL> 
-Shutting down the session...
-done.
+NOT claimed: EO-2PC / Exactly-Once E2E / multi-JM HA / checkpoint-on-S3
 PASS

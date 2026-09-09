@@ -1,4 +1,5 @@
-# ChangeLake Phase 3 — MySQL + Flink JM/TM + MinIO (Paimon S3 warehouse)
+# ChangeLake Phase 4 — MySQL + Flink JM/TM + MinIO (Paimon S3 warehouse)
+# G6: TM kill + checkpoint restore (named volume /checkpoints; JM user 0)
 # CDC jars (flink-sql-connector-mysql-cdc + mysql-connector-j + paimon-s3) from ./flink/lib
 # via container entrypoint. Pipeline started by scripts/start_pipeline.sh.
 # Demo credentials only — see README / .env.example.
@@ -126,7 +127,13 @@ services:
         state.backend: hashmap
         state.checkpoints.dir: file:///checkpoints
         state.savepoints.dir: file:///savepoints
-        execution.checkpointing.interval: 30s
+        execution.checkpointing.interval: 10s
+        execution.checkpointing.min-pause: 5s
+        execution.checkpointing.timeout: 10min
+        execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
+        restart-strategy.type: fixed-delay
+        restart-strategy.fixed-delay.attempts: 10
+        restart-strategy.fixed-delay.delay: 5s
         classloader.resolve-order: parent-first
     volumes:
       - ./flink/lib:/jars:ro
@@ -180,7 +187,13 @@ services:
         state.backend: hashmap
         state.checkpoints.dir: file:///checkpoints
         state.savepoints.dir: file:///savepoints
-        execution.checkpointing.interval: 30s
+        execution.checkpointing.interval: 10s
+        execution.checkpointing.min-pause: 5s
+        execution.checkpointing.timeout: 10min
+        execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
+        restart-strategy.type: fixed-delay
+        restart-strategy.fixed-delay.attempts: 10
+        restart-strategy.fixed-delay.delay: 5s
         classloader.resolve-order: parent-first
     volumes:
       - ./flink/lib:/jars:ro
