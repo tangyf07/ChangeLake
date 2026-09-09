@@ -1,7 +1,7 @@
 [project]
 name = "changelake"
-version = "0.1.0"
-description = "ChangeLake Phase 6 — Backfill / G7 on MySQL + Flink CDC + Paimon"
+version = "0.10.0"
+description = "ChangeLake Phase 10 — MySQL CDC → Flink → Paimon lakehouse (G1–G10 + engineering)"
 requires-python = ">=3.11"
 dependencies = []
 
@@ -10,3 +10,4 @@ dev = ["pytest>=8.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]

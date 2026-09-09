@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main, "phase-*"]
+  pull_request:
+
+jobs:
+  unit:
+    name: lint + pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test deps
+        run: pip install "pytest>=8.0"
+      - name: Compile Python
+        run: python -m compileall -q python tests
+      - name: Bash syntax check (core scripts)
+        run: |
+          set -euo pipefail
+          for f in scripts/*.sh; do
+            bash -n "$f"
+          done
+      - name: pytest
+        run: python -m pytest -q
+      - name: Honesty note
+        run: |
+          echo "CI covers unit tests + static syntax only."
+          echo "Full Golden Path (make demo) is local Docker E2E — see README."

@@ -23,9 +23,7 @@ if (( need_jars == 1 )); then
 fi
 
 echo "[dwd-ads] ensuring Paimon catalog exists"
-if ! docker compose exec -T jobmanager ./bin/sql-client.sh -e "SHOW CATALOGS;" 2>/dev/null | grep -q paimon; then
-  docker compose exec -T jobmanager ./bin/sql-client.sh -f /opt/flink/sql-changelake/paimon_catalog.sql
-fi
+echo "[dwd-ads] skip SHOW CATALOGS (sql-client -e can hang; submit SQL creates catalog in-session)"
 
 # Ensure dwd/ads DDL (fresh sql-client session + CREATE CATALOG inside dwd.sql/ads.sql)
 echo "[dwd-ads] ensuring dwd/ads DDL"

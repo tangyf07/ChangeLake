@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ChangeLake Phase 9 Golden Path: G1–G6 + P5 DWD/ADS + G7 Backfill + G8 Time Travel + G9 Reconcile + G10 Compaction.
+# ChangeLake Phase 10 Golden Path: G1–G6 + P5 + G7 + G8 + G9 + G10 (+ engineering gates outside this script).
 # Output format: spec §22. Hard fail → exit 2 (never WARNING-and-continue).
 set -euo pipefail
 
@@ -68,7 +68,7 @@ print_summary() {
   cat <<SUM
 
 ==================================================
-ChangeLake Golden Path (Phase 9: G1–G6 + P5 + G7 + G8 + G9 + G10)
+ChangeLake Golden Path (Phase 10: G1–G6 + P5 + G7 + G8 + G9 + G10)
 ==================================================
 
 G1  Initial Snapshot       ${G1_STATUS}
@@ -86,8 +86,10 @@ G10 Compaction             ${G10_STATUS}
 SUM
   if [[ "$G1_STATUS" == PASS && "$G2_STATUS" == PASS && "$G3_STATUS" == PASS && "$G4_STATUS" == PASS && "$G5_STATUS" == PASS && "$G6_STATUS" == PASS && "$P5_STATUS" == PASS && "$G7_STATUS" == PASS && "$G8_STATUS" == PASS && "$G9_STATUS" == PASS && "$G10_STATUS" == PASS ]]; then
     echo "ALL PASS (G1–G6 + P5 + G7 + G8 + G9 + G10)"
+    echo "DEMO_EXIT=0"
   else
     echo "FAILED"
+    echo "DEMO_EXIT=2"
   fi
 }
 
@@ -109,7 +111,7 @@ wait_until() {
 }
 
 # --- Preconditions ---
-echo "[demo] ChangeLake Phase 9 Golden Path G1–G6 + P5 + G7 + G8 + G9 + G10"
+echo "[demo] ChangeLake Phase 10 Golden Path G1–G6 + P5 + G7 + G8 + G9 + G10"
 echo "[demo] Flink UI port: ${FLINK_UI_PORT} → $(flink_ui)"
 bash "$ROOT/scripts/wait_services.sh"
 

@@ -1,9 +1,11 @@
-# Limitations (Phase 8)
+# Limitations (Phase 10)
 
-ChangeLake Phase 8 delivers **MySQL → Flink CDC → Paimon ODS** for Golden Path **G1–G6**,
+ChangeLake Phase 10 delivers **MySQL → Flink CDC → Paimon ODS** for Golden Path **G1–G6**,
 plus **DWD + ADS** (`dwd.dwd_orders`, `ads.ads_order_daily`), plus **G7 date-scoped backfill**,
 plus **G8 Paimon snapshot time travel** on dedicated `ods.ods_tt_demo`,
-plus **G9 source↔lake reconcile** (MySQL ↔ ODS counts + DECIMAL amount checks).
+plus **G9 source↔lake reconcile** (MySQL ↔ ODS counts + DECIMAL amount checks),
+plus **G10 demo compaction** on dedicated `ods.ods_compact_demo` (fingerprint hard gate).
+Phase 10 also adds **pytest + light CI** (unit/static only — not full Docker E2E).
 
 ## Architecture Decision (storage)
 
@@ -15,7 +17,7 @@ Paimon warehouse is **MinIO (S3-compatible)**, not `file:///warehouse`.
   (`file:///checkpoints`; G6 depends on this volume surviving TM kill — not moved to S3).
 - Demo MinIO keys (`minioadmin` / `minioadmin`) are **demo-only**.
 
-## What Phase 8 includes
+## What Phase 10 includes
 
 - Docker Compose: MySQL 8.0.40 + Flink 1.18.1 JobManager/TaskManager + MinIO
 - Deterministic seed (`seed=42`): `users=20` / `orders=50` / `order_items=85`
@@ -34,6 +36,8 @@ Paimon warehouse is **MinIO (S3-compatible)**, not `file:///warehouse`.
   (MySQL snapshot → dt-scoped DWD/ADS replace; idempotent fingerprint)
 - **G8 Time Travel** `scripts/time_travel.sh` / `make time-travel` (+ `verify_time_travel.sh`)
   (dedicated `ods.ods_tt_demo`; S1/S2/S3; `scan.snapshot-id`; evidence snapshot id + commit time)
+- **G10 Compaction** `scripts/compaction.sh` / `make compaction` (dedicated table; fingerprint gate)
+- **pytest / light CI** (`make test`, `.github/workflows/ci.yml`)
 - **G9 Reconcile** `scripts/reconcile.sh` / `make reconcile` (+ `python/reconcile_report.py`)
   (MySQL ↔ ODS row counts + `SUM(amount)` total/by-dt/by-dt+channel; DECIMAL tol 0.01;
   report `source_reconcile_report` CSV/JSON; optional cheap DWD checks)
@@ -42,9 +46,8 @@ Paimon warehouse is **MinIO (S3-compatible)**, not `file:///warehouse`.
 - Flink UI via `FLINK_UI_PORT` (default `8081`; conflict example `18081`)
 - Works without GNU Make (`bash` + `docker compose`)
 
-## What Phase 8 does **not** include
+## What Phase 10 does **not** include
 
-- **G10** (compaction)
 - Continuous / scheduled reconcile monitoring (G9 is a **demo** current-state check)
 - General-purpose backfill orchestrator (Airflow/etc.) — G7 is **demo** partition-scoped logic
 - Continuous streaming ADS aggregation (Phase 5 uses **batch** `INSERT OVERWRITE`)

@@ -1,0 +1,22 @@
+Phase 10 / Engineering — local verify PASS (WSL Docker, 2026-09-09 Asia/Shanghai)
+
+PR: https://github.com/tangyf07/ChangeLake/pull/9
+Branch: phase-10-engineering
+Tip under test (runtime scripts + hang fix): 4777a2ab35f081ee029bf999b32c77d59e1be133
+FLINK_UI_PORT=18081
+
+Results:
+- pytest: 29 passed (named suites sample_data/reconcile/backfill_idempotency/business_metrics/schema_contract + helpers)
+- make demo: ALL PASS (G1–G6 + P5 + G7 + G8 + G9 + G10)
+- DEMO_EXIT=0
+- G10: file_count 30→1; fingerprint match 07d78e13…5127b4fc
+- Fix included: drop hanging sql-client `SHOW CATALOGS` in start_pipeline/start_dwd_ads
+
+Evidence:
+- docs/evidence/g10_compaction.txt (PASS)
+- this file
+- demo log: local Temp/p10-demo2.log (ALL PASS / DEMO_EXIT=0)
+
+CI honesty: GitHub Actions = lint + pytest only; Full Golden Path is local Docker E2E.
+
+NOT claimed: CI covers Flink CDC E2E; EO-2PC; production compaction SLA.
