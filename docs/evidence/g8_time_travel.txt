@@ -2,15 +2,20 @@ G8 Time Travel / Phase 7
 table=ods.ods_tt_demo
 order_id=100
 method=Paimon Flink SQL /*+ OPTIONS('scan.snapshot-id'='N') */
+optional_flink_118=FOR SYSTEM_TIME AS OF TIMESTAMP '2026-09-09 07:19:16' also returned a historical row (best-effort)
 S1_action=INSERT amount=100.00 status=created
-S1_snapshot_id=NOT_RUN
-S1_commit_time=NOT_RUN
+S1_snapshot_id=1
+S1_commit_time=2026-09-09 07:18:57.693
 S2_action=UPDATE amount=200.00 status=paid
-S2_snapshot_id=NOT_RUN
-S2_commit_time=NOT_RUN
+S2_snapshot_id=2
+S2_commit_time=2026-09-09 07:19:16.848
 S3_action=DELETE (row absent)
-S3_snapshot_id=NOT_RUN
-S3_commit_time=NOT_RUN
+S3_snapshot_id=3
+S3_commit_time=2026-09-09 07:19:35.758
+current_state=absent (after S3)
+historical_S1=amount≈100 present
+historical_S2=amount≈200 present
+historical_S3=absent
 dedicated_table=yes (does not mutate ods_orders / G1–G7 counts)
 NOT claimed: EO-2PC / Exactly-Once E2E / G9–G10 / full reconcile / compaction / continuous CDC time travel
-STATUS=NOT RUN (fill by: bash scripts/time_travel.sh or make demo)
+PASS
