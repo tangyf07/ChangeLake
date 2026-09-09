@@ -1,8 +1,16 @@
 G10 Compaction / Phase 9
 table=ods.ods_compact_demo
-status=NOT RUN (fill by scripts/compaction.sh on a local Docker stack)
 method=CALL sys.compact('ods.ods_compact_demo', '', '', '', 'sink.parallelism=1', '', '', 'full')
-flink=1.18.1 positional; paimon=1.4.2; compact_strategy=full; write-only inserts
-hard_gate=fingerprint_before == fingerprint_after
-soft_expect=file_count reduced (do not hard-fail if noisy)
+flink=1.18.1 positional procedure args; paimon=1.4.2; compact_strategy=full; runtime-mode=batch
+write_mode=write-only=true; datagen→INSERT SELECT (1/session; scale=30x100)
+batches=30 rows_per_batch=100 row_count=3000
+BEFORE snapshot_count=30 file_count=30 total_file_size_bytes=67156 query_latency_ms=8245
+AFTER  snapshot_count=31 file_count=1 total_file_size_bytes=16345 query_latency_ms=8022
+fingerprint_before=07d78e13c46d8379956f9659a9d9969c689d79ea338b0761eaf4a8725127b4fc
+fingerprint_after=07d78e13c46d8379956f9659a9d9969c689d79ea338b0761eaf4a8725127b4fc
+fingerprint_match=yes
+soft_file_count=reduced (file_count reduced 30 → 1 (soft PASS))
+latency_note=latency_ms 8245 → 8022 (informational only; local small data is noisy — NOT a hard gate)
+dedicated_table=yes (does not mutate ods_orders / G1–G9 golden-path counts)
 NOT claimed: production sizing SLA / EO-2PC / Exactly-Once E2E / latency % drop / continuous CDC compaction
+PASS
