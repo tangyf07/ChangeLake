@@ -129,9 +129,10 @@ HDR
     cat
   } >"$sql_file"
   docker compose cp "$sql_file" jobmanager:/tmp/changelake_query.sql >/dev/null
-  # Capture status before any other builtin (e.g. `local`) clobbers $?.
-  if ! docker compose exec -T jobmanager ./bin/sql-client.sh -f /tmp/changelake_query.sql >"$tmp" 2>&1; then
-    rc=$?
+  # IMPORTANT: after `if ! cmd; then`, $? is 0 (the if succeeded). Capture rc right after exec.
+  docker compose exec -T jobmanager ./bin/sql-client.sh -f /tmp/changelake_query.sql >"$tmp" 2>&1
+  rc=$?
+  if (( rc != 0 )); then
     echo "[common] paimon_sql failed (rc=$rc)" >&2
     cat "$tmp" >&2
     rm -f "$tmp" "$sql_file"
