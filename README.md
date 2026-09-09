@@ -2,15 +2,15 @@
 
 可复现的 CDC 增量湖仓演示：**MySQL → Flink CDC → Apache Paimon (MinIO)**。
 
-> **当前仓库状态：Phase 7（Snapshot / Time Travel / G8）**  
+> **当前仓库状态：Phase 8（Reconcile / G9）**  
 > Flink SQL `mysql-cdc` → Paimon ODS → **DWD** `dwd_orders` → **ADS** `ads_order_daily`（MinIO S3）。  
-> Golden Path **G1–G6 + P5 + G7 + G8**（含日期范围幂等 Backfill + Paimon snapshot time travel）。  
-> **尚未**实现 G9–G10、全量 Reconcile、Compaction。  
-> **不声称** EO-2PC / Exactly-Once E2E / 连续流式 ADS / 通用 Backfill 编排器 / 生产级快照保留 SLA。
+> Golden Path **G1–G6 + P5 + G7 + G8 + G9**（含日期范围幂等 Backfill + Paimon snapshot time travel + source↔lake reconcile）。  
+> **尚未**实现 G10 Compaction。  
+> **不声称** EO-2PC / Exactly-Once E2E / 连续监控式 Reconcile / 连续流式 ADS / 通用 Backfill 编排器 / 生产级快照保留 SLA。
 
 ## Why
 
-业务库里的可变关系数据，如何通过 CDC 进入现代湖仓，并在 UPDATE / DELETE / **DDL** / **TM 故障**后仍保持当前状态正确，再冻结 DWD 语义并产出 ADS 日指标，对历史错误日做 **分区级 Backfill**，最后用 Paimon **Snapshot Time Travel** 回看 INSERT→UPDATE→DELETE——Phase 7 在 G1–G6 + P5 + G7 基础上加入 G8（专用表 `ods.ods_tt_demo`；`scan.snapshot-id`；不声称 EO-2PC）。
+业务库里的可变关系数据，如何通过 CDC 进入现代湖仓，并在 UPDATE / DELETE / **DDL** / **TM 故障**后仍保持当前状态正确，再冻结 DWD 语义并产出 ADS 日指标，对历史错误日做 **分区级 Backfill**，用 Paimon **Snapshot Time Travel** 回看 INSERT→UPDATE→DELETE，最后用 **G9 Reconcile** 核对 MySQL↔ODS 行数与金额——Phase 8 在 G1–G6 + P5 + G7 + G8 基础上加入 G9（DECIMAL 容差 0.01；当前状态演示核对，非连续监控 / 非 EO-2PC）。
 
 ## Architecture Decision (storage)
 
@@ -20,7 +20,7 @@
 
 **原因：** Docker Desktop 本地 FS / VirtioFS 上 Paimon `Mkdirs failed`；对象存储避开该类本地 mkdir 问题。Flink checkpoint 仍用 named volume（G6 依赖 `/checkpoints` 在 TM kill 后仍可读）。
 
-## Architecture (Phase 7)
+## Architecture (Phase 8)
 
 ```text
 MySQL 8.0.40 (ROW binlog + GTID)
@@ -38,6 +38,7 @@ Paimon 1.4.2 PK tables  (paimon-s3-1.4.2.jar)
   ads.ads_order_daily  (Phase 5; dt + channel; NULL channel → 'unknown')
   G7 backfill: MySQL(dt) → replace DWD/ADS for that dt (bypass CDC)
   G8 time travel: ods.ods_tt_demo snapshots (S1/S2/S3) via scan.snapshot-id
+  G9 reconcile: MySQL ↔ ODS counts + SUM(amount) (total / dt / dt+channel)
 ```
 
 Named volumes: `changelake_mysql_data`, `changelake_minio_data`,
@@ -64,10 +65,11 @@ Named volumes: `changelake_mysql_data`, `changelake_minio_data`,
 - DWD/ADS: [`docs/dwd-ads.md`](docs/dwd-ads.md)
 - Backfill / G7: [`docs/backfill.md`](docs/backfill.md)
 - Time Travel / G8: [`docs/time-travel.md`](docs/time-travel.md)
+- Reconcile / G9: [`docs/reconcile.md`](docs/reconcile.md)
 
 ## Quickstart
 
-推荐运行顺序：**up → MinIO healthy/bucket → smoke_storage → demo_golden_path (G1→G6→P5→G7→G8)**。
+推荐运行顺序：**up → MinIO healthy/bucket → smoke_storage → demo_golden_path (G1→G6→P5→G7→G8→G9)**。
 
 ```bash
 cp .env.example .env          # demo credentials only (incl. MinIO minioadmin/minioadmin)
@@ -77,7 +79,7 @@ bash scripts/bootstrap.sh --jars-only
 docker compose up -d
 bash scripts/wait_services.sh
 bash scripts/smoke_storage.sh          # Flink → Paimon → MinIO MUST PASS
-bash scripts/demo_golden_path.sh       # G1→G6→P5→G7→G8
+bash scripts/demo_golden_path.sh       # G1→G6→P5→G7→G8→G9
 ```
 
 有 GNU Make 时：
@@ -160,6 +162,19 @@ bash scripts/time_travel.sh
 
 期望：`[G8] PASS time travel`；证据 `docs/evidence/g8_time_travel.txt`。详见 [`docs/time-travel.md`](docs/time-travel.md)。
 
+### Reconcile / G9 (Phase 8)
+
+MySQL ↔ Paimon ODS **当前状态**核对：表级行数（users / orders / order_items）+ `SUM(amount)`（总计、按 `dt`、按 `dt+channel`）。
+金额只用 **DECIMAL**（`python/reconcile_report.py`），容差 **0.01**。报告列：`metric  source  lake  diff  status`。
+ODS 金额按 channel 时 **NULL 保持 NULL**（ADS 的 `unknown` 仅 Phase 5；见 [`docs/reconcile.md`](docs/reconcile.md)）。
+
+```bash
+bash scripts/reconcile.sh
+# 或: make reconcile
+```
+
+期望：`[G9] PASS reconcile`；证据 `docs/evidence/g9_reconcile.txt` + `docs/evidence/source_reconcile_report.{csv,json}`（`reports/` 有镜像）。
+
 ### Storage smoke
 
 ```bash
@@ -169,7 +184,7 @@ bash scripts/smoke_storage.sh
 
 期望：`[smoke_storage] PASS Flink → Paimon → MinIO write/read`（断言 **SELECT 结果行**含 `minio-ok`）。
 
-### Golden Path G1–G6 + P5 + G7 + G8
+### Golden Path G1–G6 + P5 + G7 + G8 + G9
 
 ```bash
 bash scripts/demo_golden_path.sh
@@ -188,7 +203,8 @@ bash scripts/demo_golden_path.sh
 [DWD/ADS] PASS
 [G7] PASS backfill
 [G8] PASS time travel
-ALL PASS (G1–G6 + P5 + G7 + G8)
+[G9] PASS reconcile
+ALL PASS (G1–G6 + P5 + G7 + G8 + G9)
 ```
 
 任一失败：`exit 2`（不会仅 WARNING 后继续）。
@@ -204,8 +220,9 @@ ALL PASS (G1–G6 + P5 + G7 + G8)
 | P5 | DWD `net_amount` + ADS 日指标 vs MySQL（默认 `CHECK_DT=2026-08-02`） |
 | G7 | 腐蚀 DWD → `backfill` ×2 → fingerprint 相等 + reconcile（默认 `BACKFILL_DT=2026-08-13`） |
 | G8 | `ods.ods_tt_demo`：S1 amount=100 → S2 amount=200 → S3 DELETE；按 snapshot-id 回看 |
+| G9 | MySQL ↔ ODS 行数 + `SUM(amount)`（total / dt / dt+channel）；DECIMAL tol 0.01；报告 CSV/JSON |
 
-Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`、`dwd_ads.txt`、`g7_backfill.txt`、`g8_time_travel.txt`（由 demo / verify 写入；未跑 Docker 时为 NOT RUN stub）。
+Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`、`dwd_ads.txt`、`g7_backfill.txt`、`g8_time_travel.txt`、`g9_reconcile.txt`、`source_reconcile_report.*`（由 demo / verify 写入；未跑 Docker 时为 NOT RUN stub）。
 
 ### Schema evolution support matrix (honest)
 
@@ -229,7 +246,7 @@ Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`、`dwd_ads.txt`、`g7_backfil
 
 金额均为 `DECIMAL(12,2)`。重新灌数：`make seed` / `bash scripts/seed.sh`。
 
-## Guarantees (Phase 7)
+## Guarantees (Phase 8)
 
 ```text
 MinIO warehouse for Paimon (scripted smoke)
@@ -241,10 +258,11 @@ TaskManager kill + checkpoint restore → ODS == MySQL (scripted G6)
 DWD order semantic freeze + ADS daily metrics vs MySQL (scripted P5)
 Date-scoped backfill + idempotent fingerprint (scripted G7)
 Paimon snapshot time travel on dedicated demo table (scripted G8)
-Automated Golden Path G1–G6 + P5 + G7 + G8
+MySQL ↔ ODS current-state reconcile, DECIMAL tol 0.01 (scripted G9)
+Automated Golden Path G1–G6 + P5 + G7 + G8 + G9
 ```
 
-**Not claimed:** Exactly-Once E2E / **EO-2PC**、连续流式 ADS、透明 SQL-CDC DDL、G9–G10、通用 Backfill 编排器、`coupon_amount` CDC、生产 HA/SLA / 快照保留 SLA、checkpoint-on-S3、Pipeline YAML auto schema sync、连续 CDC 作业上的 time travel。
+**Not claimed:** Exactly-Once E2E / **EO-2PC**、连续监控式 Reconcile、连续流式 ADS、透明 SQL-CDC DDL、G10 Compaction、通用 Backfill 编排器、`coupon_amount` CDC、生产 HA/SLA / 快照保留 SLA、checkpoint-on-S3、Pipeline YAML auto schema sync、连续 CDC 作业上的 time travel。
 
 ## Credentials
 
@@ -252,7 +270,7 @@ Automated Golden Path G1–G6 + P5 + G7 + G8
 
 ## Limitations
 
-详见 [`docs/limitations.md`](docs/limitations.md)。语义：[`docs/semantics.md`](docs/semantics.md)。架构：[`docs/architecture.md`](docs/architecture.md)。Schema Evolution：[`docs/schema-evolution.md`](docs/schema-evolution.md)。Failure Recovery：[`docs/failure-recovery.md`](docs/failure-recovery.md)。DWD/ADS：[`docs/dwd-ads.md`](docs/dwd-ads.md)。Backfill：[`docs/backfill.md`](docs/backfill.md)。Time Travel：[`docs/time-travel.md`](docs/time-travel.md)。
+详见 [`docs/limitations.md`](docs/limitations.md)。语义：[`docs/semantics.md`](docs/semantics.md)。架构：[`docs/architecture.md`](docs/architecture.md)。Schema Evolution：[`docs/schema-evolution.md`](docs/schema-evolution.md)。Failure Recovery：[`docs/failure-recovery.md`](docs/failure-recovery.md)。DWD/ADS：[`docs/dwd-ads.md`](docs/dwd-ads.md)。Backfill：[`docs/backfill.md`](docs/backfill.md)。Time Travel：[`docs/time-travel.md`](docs/time-travel.md)。Reconcile：[`docs/reconcile.md`](docs/reconcile.md)。
 
 ## Layout
 
@@ -265,11 +283,13 @@ flink/sql/paimon_catalog.sql  cdc_source.sql  ods.sql  dwd.sql  ads.sql
 flink/sql/submit_ods_pipeline.sql  submit_ods_pipeline_evolved.sql
 flink/sql/submit_dwd_pipeline.sql  submit_ads_pipeline.sql
 scripts/schema_evolution.sh  failure_recovery.sh  start_dwd_ads.sh  verify_dwd_ads.sh
-scripts/demo_golden_path.sh  time_travel.sh  verify_time_travel.sh  …
-docs/schema-evolution.md  failure-recovery.md  dwd-ads.md  backfill.md  time-travel.md
-docs/evidence/g1..g8_*.txt  dwd_ads.txt
+scripts/demo_golden_path.sh  time_travel.sh  verify_time_travel.sh  reconcile.sh  …
+python/reconcile_report.py
+docs/schema-evolution.md  failure-recovery.md  dwd-ads.md  backfill.md  time-travel.md  reconcile.md
+docs/evidence/g1..g9_*.txt  dwd_ads.txt  source_reconcile_report.*
+reports/source_reconcile_report.*
 ```
 
 ## Next phases (not in this commit)
 
-Phase 8+: 全量 Reconcile、Compaction（G9–G10）。
+Phase 9+: Compaction（G10）。

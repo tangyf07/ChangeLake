@@ -1,0 +1,10 @@
+G9 Reconcile / Phase 8
+path=MySQL ↔ Paimon ODS (current-state); optional DWD if present
+tolerance=0.01
+decimal_only=yes (python decimal.Decimal; no float money compare)
+channel_policy_ods=NULL as-is (report label NULL)
+channel_policy_ads=unknown is ADS-only (Phase 5); not remapped for ODS metrics
+csv=docs/evidence/source_reconcile_report.csv
+json=docs/evidence/source_reconcile_report.json
+status=NOT RUN (fill by: bash scripts/reconcile.sh / make reconcile / make demo)
+NOT claimed: continuous monitoring / EO-2PC / Exactly-Once E2E / G10 compaction / production SLA

@@ -1,4 +1,4 @@
-# Architecture (Phase 6)
+# Architecture (Phase 8)
 
 ```text
 ┌──────────────────┐
@@ -89,3 +89,12 @@ Date-scoped repair **bypasses CDC**: MySQL snapshot for `dt` → replace DWD row
 logical day → rebuild ADS for that `dt` only → reconcile + content fingerprint.
 
 See [`backfill.md`](backfill.md). **Not** an EO-2PC claim; **not** a general orchestrator.
+
+## Reconcile (Phase 8 / G9)
+
+`scripts/reconcile.sh` compares **MySQL current tables** to **Paimon ODS** current-state
+(row counts + `SUM(amount)` total / by `dt` / by `dt+channel`) with DECIMAL tolerance 0.01.
+Optional cheap DWD checks when `dwd.dwd_orders` is non-empty.
+
+Report: `docs/evidence/source_reconcile_report.{csv,json}` (+ `reports/` mirror).
+See [`reconcile.md`](reconcile.md). **Not** continuous monitoring / **not** EO-2PC.

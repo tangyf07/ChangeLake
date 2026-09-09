@@ -1,0 +1,15 @@
+Phase 8 authoring (GitHub API) — Reconcile / G9
+Base: main tip 8ee247678d7a6205b1edb26023e23a2725eb8cae
+Branch: phase-8-reconcile
+
+Delivered:
+- scripts/reconcile.sh + python/reconcile_report.py (DECIMAL, tolerance 0.01)
+- make reconcile; docs/reconcile.md; evidence/report stubs
+- demo_golden_path wires G9 after G8
+- README / golden-path / limitations updated
+
+Local Docker E2E not claimed by this authoring commit — run:
+  make jars && make up && make wait && make smoke-storage && make demo
+or standalone after G5+: make reconcile
+
+NOT claimed: continuous monitoring; EO-2PC; G10 compaction

@@ -1,0 +1,13 @@
+{
+  "report": "source_reconcile_report",
+  "tolerance": "0.01",
+  "decimal_only": true,
+  "pass_count": 0,
+  "fail_count": 0,
+  "overall": "NOT_RUN",
+  "rows": [],
+  "notes": [
+    "Stub mirror under reports/ — run bash scripts/reconcile.sh to fill.",
+    "NOT claimed: continuous monitoring / EO-2PC / Exactly-Once E2E."
+  ]
+}
