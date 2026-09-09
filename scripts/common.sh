@@ -36,7 +36,8 @@ mysql_root_exec() {
 }
 
 mysql_scalar() {
-  docker compose exec -T mysql mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" -N -e "$1" | tr -d '\r' | head -n1 | awk '{print $1}'
+  # Always select MYSQL_DATABASE (plain FROM table queries need it; information_schema does not).
+  docker compose exec -T mysql mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" -N -e "$1" "$MYSQL_DATABASE" | tr -d '\r' | head -n1 | awk '{print $1}'
 }
 
 flink_ui() {
