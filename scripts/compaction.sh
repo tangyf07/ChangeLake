@@ -376,7 +376,7 @@ if ! [[ "$COMPACT_INSERTS_PER_SESSION" =~ ^[1-9][0-9]*$ ]] || (( COMPACT_INSERTS
 fi
 echo "[g10] writing ${COMPACT_BATCHES} batches × ${COMPACT_ROWS_PER_BATCH} rows (=${EXPECTED_ROWS}; write-only → many small files)"
 echo "[g10] write path: chunked docker compose cp + sql-client -f (${COMPACT_INSERTS_PER_SESSION} INSERT(s)/session; wait FINISHED each chunk)"
-echo "[g10] session knobs: parallelism.default=1; restart-strategy=none (avoid buffer chew on fail)"
+echo "[g10] session knobs: parallelism.default=1"
 
 # Clear leftover FAILED/RESTARTING compact inserts from prior runs (frees TM network buffers).
 cancel_compact_insert_jobs
@@ -388,8 +388,6 @@ while (( batch_num < COMPACT_BATCHES )); do
   WRITE_SQL="$(mktemp)"
   {
     echo "SET 'parallelism.default' = '1';"
-    echo "SET 'table.exec.resource.default-parallelism' = '1';"
-    echo "SET 'restart-strategy.type' = 'none';"
     while (( chunk_n < COMPACT_INSERTS_PER_SESSION && batch_num < COMPACT_BATCHES )); do
       batch_insert_sql "$next_id" "$COMPACT_ROWS_PER_BATCH"
       echo
