@@ -7,7 +7,7 @@ WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
-Sep 09, 2026 5:11:30 AM org.jline.utils.Log logr
+Sep 09, 2026 5:29:59 AM org.jline.utils.Log logr
 WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
 [34;1m[INFO] Executing SQL from file.[0m
 
@@ -44,7 +44,7 @@ WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
-Sep 09, 2026 5:11:36 AM org.jline.utils.Log logr
+Sep 09, 2026 5:30:05 AM org.jline.utils.Log logr
 WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
 [34;1m[INFO] Executing SQL from file.[0m
 
@@ -81,7 +81,7 @@ WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
-Sep 09, 2026 5:11:44 AM org.jline.utils.Log logr
+Sep 09, 2026 5:30:12 AM org.jline.utils.Log logr
 WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
 [34;1m[INFO] Executing SQL from file.[0m
 

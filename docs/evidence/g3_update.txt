@@ -4,7 +4,7 @@ WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
 WARNING: Unknown module: jdk.compiler specified to --add-exports
-Sep 09, 2026 5:12:45 AM org.jline.utils.Log logr
+Sep 09, 2026 5:31:19 AM org.jline.utils.Log logr
 WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
 [34;1m[INFO] Executing SQL from file.[0m
 
