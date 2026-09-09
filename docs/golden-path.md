@@ -1,11 +1,12 @@
-# Golden Path — Phase 5 (G1–G6 + P5 DWD/ADS)
+# Golden Path — Phase 6 (G1–G6 + P5 DWD/ADS + G7 Backfill)
 
 Script: `scripts/demo_golden_path.sh` (also `make demo`).
 
 **Prereq:** MinIO healthy + bucket, then `scripts/smoke_storage.sh` PASS (Flink → Paimon → MinIO).
-Order: G1 → G2 → G3 → G4 → G5 → G6 → **P5 (DWD/ADS)**.
+Order: G1 → G2 → G3 → G4 → G5 → G6 → **P5 (DWD/ADS)** → **G7 (Backfill)**.
 
-Standalone Phase 5 check: `bash scripts/verify_dwd_ads.sh` / `make dwd-ads`.
+Standalone Phase 5 check: `bash scripts/verify_dwd_ads.sh` / `make dwd-ads`.  
+Standalone G7 check: `bash scripts/verify_backfill.sh` / `make backfill DT=2026-08-13`.
 
 | Case | Action | Pass criteria |
 | --- | --- | --- |
@@ -16,10 +17,11 @@ Standalone Phase 5 check: `bash scripts/verify_dwd_ads.sh` / `make dwd-ads`.
 | G5 | `schema_evolution.sh` + DML | ADD `channel`; pipeline RUNNING; `1→app`, `900002→web`, `2→NULL` |
 | G6 | `failure_recovery.sh` | ≥1 checkpoint → TM kill → restore → Paimon == MySQL (`3`, `900003`) |
 | P5 | `verify_dwd_ads.sh` | DWD `net_amount` + ADS daily metrics vs MySQL for a known `dt` (needs **10** TM slots; DWD checkpoint before ADS) |
+| G7 | `verify_backfill.sh` | Corrupt DWD for `BACKFILL_DT` → backfill ×2 → `fingerprint(run1)==fingerprint(run2)` + reconcile; `[G7] PASS backfill` |
 
 Hard failure → print `FAIL`, write partial evidence if any, `exit 2`. Never WARNING-and-continue.
 
-Evidence files (filled by the demo / G6 script):
+Evidence files (filled by the demo / verify scripts):
 
 ```text
 docs/evidence/g1_initial_snapshot.txt
@@ -29,10 +31,12 @@ docs/evidence/g4_delete.txt
 docs/evidence/g5_schema_evolution.txt
 docs/evidence/g6_failure_recovery.txt
 docs/evidence/dwd_ads.txt
+docs/evidence/g7_backfill.txt
 ```
 
-G7–G10 are **not** implemented in Phase 5 (P5 is DWD/ADS only).
+**G8–G10** are **not** implemented in Phase 6.
 
 Schema evolution: [`schema-evolution.md`](schema-evolution.md).  
 Failure recovery: [`failure-recovery.md`](failure-recovery.md).  
-DWD/ADS: [`dwd-ads.md`](dwd-ads.md).
+DWD/ADS: [`dwd-ads.md`](dwd-ads.md).  
+Backfill: [`backfill.md`](backfill.md).

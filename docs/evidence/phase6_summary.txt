@@ -1,0 +1,13 @@
+Phase 6 local verify (WSL Docker) @ 2026-09-09 Asia/Shanghai
+SHA under test: 04439fcbd92044d752796fcea6d11e31b1620a21 (phase-6-backfill)
+FLINK_UI_PORT=18081; slots=10
+
+Results:
+- demo_golden_path G1–G6 + P5 + G7: ALL PASS (DEMO_EXIT=0)
+- G7 BACKFILL_DT=2026-08-13: corrupt DWD (+1) visible (MySQL 262.50 vs DWD 264.50) → backfill×2
+- fingerprints equal: f2fb644b1b4289588ccfa39c8988a84614e76f76dcf6ef2452bf627776cea9cc
+- reconcile: DWD count=2 sum=262.50; ADS MATCH unknown channel
+
+Evidence: docs/evidence/g7_backfill.txt (this commit)
+NOT claimed: EO-2PC; general orchestrator; full CDC replay; G8–G10
+Non-blocking D1: cold smoke may fail

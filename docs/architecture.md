@@ -1,4 +1,4 @@
-# Architecture (Phase 5)
+# Architecture (Phase 6)
 
 ```text
 ┌──────────────────┐
@@ -43,7 +43,7 @@ workarounds aimed at local Paimon `LocalFileIO`.
 **Why:** On Docker Desktop (WSL2 / VirtioFS), Paimon local filesystem writers hit
 `Mkdirs failed to create .../bucket-*`. Object storage avoids that class of local-FS
 mkdir races for the lakehouse path. Flink checkpoints remain on named volumes for now
-(not Phase 6 scope).
+(checkpoints remain on named volumes; Phase 6 adds G7 backfill only).
 
 No Kafka / HDFS / Hive / Airflow.
 
@@ -81,3 +81,11 @@ completed checkpoint (committed rows). See [`dwd-ads.md`](dwd-ads.md).
 Flink `taskmanager.numberOfTaskSlots=10` so ODS + DWD + ADS + sql-client collect fit.
 
 G7–G10 / Phase 6+ remain unimplemented. **Not** an EO-2PC claim.
+
+
+## Backfill / G7 (Phase 6)
+
+Date-scoped repair **bypasses CDC**: MySQL snapshot for `dt` → replace DWD rows for that
+logical day → rebuild ADS for that `dt` only → reconcile + content fingerprint.
+
+See [`backfill.md`](backfill.md). **Not** an EO-2PC claim; **not** a general orchestrator.
