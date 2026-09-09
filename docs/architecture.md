@@ -1,4 +1,4 @@
-# Architecture (Phase 2)
+# Architecture (Phase 3)
 
 ```text
 ┌──────────────────┐
@@ -44,3 +44,13 @@ mkdir races for the lakehouse path. Flink checkpoints remain on named volumes fo
 (not Phase 6 scope).
 
 No Kafka / HDFS / Hive / Airflow.
+
+
+## Schema evolution (Phase 3)
+
+Baseline job uses `submit_ods_pipeline.sql` (no `channel`).
+G5 uses an **explicit migration**: MySQL `ADD COLUMN` → Paimon `ALTER TABLE … ADD` →
+resubmit `submit_ods_pipeline_evolved.sql` (does not DROP ODS).
+
+Flink SQL `mysql-cdc` does not transparently expand table schemas at runtime; see
+[`schema-evolution.md`](schema-evolution.md).

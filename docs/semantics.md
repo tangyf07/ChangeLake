@@ -1,4 +1,4 @@
-# Semantics (Phase 2 scope)
+# Semantics (Phase 3 scope: G1–G5)
 
 ## CDC
 
@@ -34,3 +34,31 @@ All money columns are `DECIMAL(12,2)` end-to-end (MySQL, Flink, Paimon). No `FLO
 ## Duplicates / recovery (honest)
 
 Flink checkpointing is enabled (`execution.checkpointing.interval=30s`). Phase 2 **does not** run a fault-injection experiment; do not read this as a proven EO-2PC guarantee. Paimon PK upsert is idempotent w.r.t. duplicate same-key values, which helps after at-least-once replay, but that is not an E2E exactly-once proof.
+
+
+## Schema Evolution (G5)
+
+ChangeLake Phase 3 supports **ADD COLUMN** on `orders` → `channel VARCHAR(32)` via an
+**explicit migration**, not transparent Flink SQL CDC DDL sync.
+
+```text
+MySQL ALTER ADD COLUMN (pipeline may stay RUNNING)
+        ↓
+Paimon ALTER TABLE ods.ods_orders ADD channel STRING
+        ↓
+Resubmit Flink SQL with evolved mysql_orders + SELECT channel
+        ↓
+ODS shows channel; old rows NULL; new DML syncs values
+```
+
+### Support matrix (honest)
+
+| DDL | Status |
+| --- | --- |
+| ADD COLUMN (nullable) | **Tested** via G5 explicit migration |
+| DROP COLUMN | Not tested / not claimed |
+| RENAME COLUMN | Not tested / not claimed |
+| ALTER COLUMN TYPE | Not tested / not claimed |
+
+Flink SQL `mysql-cdc` 3.1.1 table schemas are fixed at submit time. Pipeline YAML schema
+evolution is out of MVP scope. Details: [`schema-evolution.md`](schema-evolution.md).

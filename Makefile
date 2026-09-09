@@ -1,4 +1,4 @@
-# ChangeLake Phase 2 (G1–G4 CDC) — MinIO warehouse — Phase 1 targets retained
+# ChangeLake Phase 3 (G1–G5 schema evolution) — MinIO warehouse
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
@@ -6,20 +6,21 @@ COMPOSE := docker compose
 ENV_FILE := .env
 
 .PHONY: help up down reset seed jars bootstrap wait status ps logs mysql-cli flink-sql \
-	pipeline stop-pipeline demo mutate-insert mutate-update mutate-delete \
+	pipeline stop-pipeline demo mutate-insert mutate-update mutate-delete schema-evolution \
 	minio-init smoke-storage
 
 help:
-	@echo "ChangeLake Phase 2 targets:"
+	@echo "ChangeLake Phase 3 targets:"
 	@echo "  make jars            Download Paimon + paimon-s3 + Hadoop + Flink CDC + MySQL JDBC"
 	@echo "  make up              cp .env.example .env (if missing) && compose up -d"
 	@echo "  make wait            Wait until MinIO + MySQL + Flink UI are healthy"
 	@echo "  make minio-init      Ensure MinIO bucket exists (idempotent)"
 	@echo "  make smoke-storage   Flink → Paimon → MinIO write/read smoke (before G1)"
 	@echo "  make seed            Re-apply deterministic seed (seed=42) into MySQL"
-	@echo "  make pipeline        Start MySQL CDC → Paimon ODS job"
+	@echo "  make pipeline        Start MySQL CDC → Paimon ODS job (baseline schema)"
 	@echo "  make stop-pipeline   Cancel ODS CDC job"
-	@echo "  make demo            Golden Path G1–G4 (bash scripts/demo_golden_path.sh)"
+	@echo "  make schema-evolution  G5 explicit migration (ADD channel + evolved resubmit)"
+	@echo "  make demo            Golden Path G1–G5 (bash scripts/demo_golden_path.sh)"
 	@echo "  make down / reset / status / mysql-cli / bootstrap"
 	@echo "  Note: FLINK_UI_PORT from .env (default 8081; use 18081 if busy)"
 	@echo "  Order: jars → up → wait → smoke-storage → demo"
@@ -62,6 +63,9 @@ stop-pipeline:
 
 demo:
 	bash scripts/demo_golden_path.sh
+
+schema-evolution:
+	bash scripts/schema_evolution.sh
 
 mutate-insert:
 	bash scripts/mutate_insert.sh

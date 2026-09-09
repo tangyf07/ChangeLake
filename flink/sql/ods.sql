@@ -1,5 +1,7 @@
--- ChangeLake Phase 2: ODS Primary Key tables (current-state mirror)
+-- ChangeLake Phase 3: ODS Primary Key tables (current-state mirror)
 -- PK matches MySQL source. merge-engine=deduplicate → latest logical row.
+-- Phase 3: channel is added via ALTER TABLE ods.ods_orders ADD channel STRING
+-- (see scripts/schema_evolution.sh). Baseline CREATE below has no channel.
 
 USE CATALOG paimon;
 CREATE DATABASE IF NOT EXISTS ods;
@@ -24,6 +26,7 @@ CREATE TABLE IF NOT EXISTS ods_orders (
   amount DECIMAL(12, 2),
   order_ts TIMESTAMP(0),
   updated_at TIMESTAMP(0),
+  -- channel STRING  -- added in G5 via ALTER (not in baseline CREATE)
   PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
   'bucket' = '2',

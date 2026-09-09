@@ -1,32 +1,3 @@
-# ChangeLake Phase 2 evidence
-# Host: WSL Docker on tangyf
-# Branch: phase-2-cdc @ 72e5fb7168f1b5430816c864e8a27c262e9ca4c7
-# Date: 2026-09-09 (Asia/Shanghai)
-# Commands: bash scripts/smoke_storage.sh ; bash scripts/demo_golden_path.sh
-# Result: smoke PASS; G1–G4 ALL PASS; DEMO_EXIT=0
-
-==================================================
-[G4] Delete
-==================================================
-[mutate] DELETE order_id=900001
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
-[mutate] mysql remaining rows for 900001: 0
-[wait] ods_orders order_id=900001 absent (timeout=180s)
- changelake-jobmanager Copying /tmp/tmp.Ccn8hdegdv to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.Ccn8hdegdv to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copying /tmp/tmp.1inYMejnIY to changelake-jobmanager:/tmp/changelake_query.sql
- changelake-jobmanager Copied /tmp/tmp.1inYMejnIY to changelake-jobmanager:/tmp/changelake_query.sql
-[G4] PASS delete
-
-==================================================
-ChangeLake Golden Path (Phase 2: G1–G4)
-==================================================
-
-G1  Initial Snapshot       PASS
-G2  Insert                 PASS
-G3  Update                 PASS
-G4  Delete                 PASS
-
-ALL PASS (G1–G4)
-DEMO_EXIT=0
+G4 Delete order_id=900001
+current-state count=0
+PASS

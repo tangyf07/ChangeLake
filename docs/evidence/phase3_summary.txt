@@ -1,0 +1,10 @@
+Phase 3 local verify (WSL Docker) @ 2026-09-09 Asia/Shanghai
+SHA under test: 2760c6374c0a474394c5c0d4c557505da6c062af (phase-3-schema zip)
+FLINK_UI_PORT=18081
+
+Results:
+- demo_golden_path G1–G5: ALL PASS (DEMO_EXIT=0)
+- G5: ADD COLUMN channel via explicit migration; order_id=1 channel=app; order_id=2 NULL; order_id=900002 channel=web
+- smoke_storage: FAIL on first cold run (probe row assert, SMOKE_EXIT=2); non-blocking vs Phase 2 D1 note; stack later disturbed by smoke JM restart — not used as Phase 3 gate
+
+Evidence: docs/evidence/g1_*.txt … g5_schema_evolution.txt (this commit)
