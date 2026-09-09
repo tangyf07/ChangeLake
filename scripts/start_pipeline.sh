@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start MySQL CDC → Paimon ODS streaming pipeline (Phase 2).
+# Start MySQL CDC → Paimon ODS streaming pipeline (Phase 3).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -179,3 +179,56 @@ FROM ods.ods_orders
 WHERE order_id = ${oid};
 SQL
 }
+
+
+flink_job_is_running() {
+  local needle="${1:-$PIPELINE_JOB_NAME}"
+  python3 -c "
+import json, urllib.request, sys
+ui, needle = sys.argv[1], sys.argv[2]
+try:
+    data = json.load(urllib.request.urlopen(ui + '/jobs/overview', timeout=5))
+except Exception:
+    sys.exit(1)
+for j in data.get('jobs', []):
+    name = j.get('name') or ''
+    state = (j.get('state') or '').upper()
+    if needle in name and state == 'RUNNING':
+        sys.exit(0)
+sys.exit(1)
+" "$(flink_ui)" "$needle"
+}
+
+paimon_column_exists() {
+  # paimon_column_exists <database> <table> <column>
+  local db="$1" table="$2" col="$3"
+  local out
+  out="$(paimon_sql <<SQL
+DESCRIBE ${db}.${table};
+SQL
+)" || return 1
+  echo "$out" | grep -qiE "(^|[|[:space:]])${col}([|[:space:]]|$)" 
+}
+
+ods_orders_query_channel() {
+  local oid="$1"
+  paimon_sql <<SQL
+SELECT order_id, user_id, status, CAST(amount AS STRING) AS amount,
+       CAST(channel AS STRING) AS channel
+FROM ods.ods_orders
+WHERE order_id = ${oid};
+SQL
+}
+
+mysql_drop_orders_channel_if_exists() {
+  # Reset baseline schema for repeatable G1–G4 before G5.
+  local cnt
+  cnt="$(mysql_scalar "
+SELECT COUNT(*) FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA='changelake' AND TABLE_NAME='orders' AND COLUMN_NAME='channel';
+")" || cnt=0
+  if [[ "$cnt" == "1" ]]; then
+    echo "[common] dropping orders.channel to restore Phase 2 baseline schema"
+    mysql_exec -e "ALTER TABLE orders DROP COLUMN channel;" >/dev/null
+  fi
+}

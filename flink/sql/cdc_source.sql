@@ -1,8 +1,11 @@
--- ChangeLake Phase 2: MySQL CDC sources (Flink SQL connector mysql-cdc)
+-- ChangeLake Phase 3: MySQL CDC sources (Flink SQL connector mysql-cdc)
 -- Connector: flink-sql-connector-mysql-cdc 3.1.1 (Flink 1.18)
 -- Docs: https://nightlies.apache.org/flink/flink-cdc-docs-release-3.1/docs/connectors/flink-sources/mysql-cdc/
 -- Requires REPLICATION SLAVE/CLIENT on MySQL user (see mysql/003_cdc_grants.sql).
 -- Distinct server-id ranges per table (must not overlap with MySQL server-id=1).
+-- Phase 3 note: Flink SQL mysql-cdc schema is fixed at CREATE TABLE time.
+-- After MySQL ADD COLUMN channel, resubmit with evolved DDL (see submit_ods_pipeline_evolved.sql).
+-- Transparent runtime DDL sync is NOT available on this SQL connector (Pipeline YAML only).
 
 CREATE TABLE IF NOT EXISTS default_catalog.default_database.mysql_users (
   user_id BIGINT,

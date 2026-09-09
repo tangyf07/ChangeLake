@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ChangeLake Phase 2 Golden Path: G1–G4 only (snapshot / insert / update / delete).
+# ChangeLake Phase 3 Golden Path: G1–G5 (snapshot / insert / update / delete / schema evolution).
 # Output format: spec §22. Hard fail → exit 2 (never WARNING-and-continue).
 set -euo pipefail
 
@@ -14,6 +14,7 @@ G1_STATUS=PENDING
 G2_STATUS=PENDING
 G3_STATUS=PENDING
 G4_STATUS=PENDING
+G5_STATUS=PENDING
 
 fail_case() {
   local id="$1"
@@ -26,6 +27,7 @@ fail_case() {
     G2) G2_STATUS=FAIL ;;
     G3) G3_STATUS=FAIL ;;
     G4) G4_STATUS=FAIL ;;
+    G5) G5_STATUS=FAIL ;;
   esac
   print_summary
   exit 2
@@ -40,6 +42,7 @@ pass_case() {
     G2) G2_STATUS=PASS ;;
     G3) G3_STATUS=PASS ;;
     G4) G4_STATUS=PASS ;;
+    G5) G5_STATUS=PASS ;;
   esac
 }
 
@@ -47,17 +50,18 @@ print_summary() {
   cat <<SUM
 
 ==================================================
-ChangeLake Golden Path (Phase 2: G1–G4)
+ChangeLake Golden Path (Phase 3: G1–G5)
 ==================================================
 
 G1  Initial Snapshot       ${G1_STATUS}
 G2  Insert                 ${G2_STATUS}
 G3  Update                 ${G3_STATUS}
 G4  Delete                 ${G4_STATUS}
+G5  Schema Evolution       ${G5_STATUS}
 
 SUM
-  if [[ "$G1_STATUS" == PASS && "$G2_STATUS" == PASS && "$G3_STATUS" == PASS && "$G4_STATUS" == PASS ]]; then
-    echo "ALL PASS (G1–G4)"
+  if [[ "$G1_STATUS" == PASS && "$G2_STATUS" == PASS && "$G3_STATUS" == PASS && "$G4_STATUS" == PASS && "$G5_STATUS" == PASS ]]; then
+    echo "ALL PASS (G1–G5)"
   else
     echo "FAILED"
   fi
@@ -81,14 +85,17 @@ wait_until() {
 }
 
 # --- Preconditions ---
-echo "[demo] ChangeLake Phase 2 Golden Path G1–G4"
+echo "[demo] ChangeLake Phase 3 Golden Path G1–G5"
 echo "[demo] Flink UI port: ${FLINK_UI_PORT} → $(flink_ui)"
 bash "$ROOT/scripts/wait_services.sh"
 
+# Restore baseline MySQL schema (no channel) so G1–G4 stay Phase-2-shaped on reruns
+mysql_drop_orders_channel_if_exists
+
 # Clean MySQL mutation residue + re-seed deterministic baseline
-echo "[demo] re-seed MySQL (seed=42) and ensure order 900001 absent"
+echo "[demo] re-seed MySQL (seed=42) and ensure order 900001/900002 absent"
 bash "$ROOT/scripts/seed.sh"
-mysql_exec -e "DELETE FROM orders WHERE order_id = 900001;" >/dev/null || true
+mysql_exec -e "DELETE FROM orders WHERE order_id IN (900001, 900002);" >/dev/null || true
 
 SRC_USERS="$(mysql_scalar "SELECT COUNT(*) FROM changelake.users;")"
 SRC_ORDERS="$(mysql_scalar "SELECT COUNT(*) FROM changelake.orders;")"
@@ -98,7 +105,7 @@ if [[ "$SRC_USERS" != "20" || "$SRC_ORDERS" != "50" || "$SRC_ITEMS" != "85" ]]; 
   exit 2
 fi
 
-# Start (or restart) CDC pipeline → recreates ODS tables + initial snapshot
+# Start (or restart) CDC pipeline → recreates ODS tables + initial snapshot (no channel)
 bash "$ROOT/scripts/stop_pipeline.sh" || true
 bash "$ROOT/scripts/start_pipeline.sh"
 
@@ -273,6 +280,98 @@ fi
   echo "PASS"
 } >"$EVIDENCE_DIR/g4_delete.txt"
 pass_case G4 "delete"
+
+# ==================================================
+# G5 Schema Evolution
+# ==================================================
+echo
+echo "=================================================="
+echo "[G5] Schema Evolution"
+echo "=================================================="
+
+if ! flink_job_is_running "$PIPELINE_JOB_NAME"; then
+  fail_case G5 "schema evolution" "pipeline not RUNNING before evolution"
+fi
+
+# Explicit migration: MySQL ALTER (while RUNNING) → Paimon ADD → resubmit evolved job
+bash "$ROOT/scripts/schema_evolution.sh"
+
+if ! flink_job_is_running "$PIPELINE_JOB_NAME"; then
+  fail_case G5 "schema evolution" "evolved pipeline not RUNNING after resubmit"
+fi
+
+# Post-evolution DML
+docker compose exec -T mysql mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" < "$ROOT/mysql/mutations/schema_evolution_dml.sql"
+
+check_g5_channel_app() {
+  local out
+  out="$(ods_orders_query_channel 1)" || return 1
+  echo "$out" | grep -qE '(^|[|[:space:]])1([|[:space:]]|$)' || return 1
+  echo "$out" | grep -qw 'app' || return 1
+}
+
+check_g5_channel_web() {
+  local out
+  out="$(ods_orders_query_channel 900002)" || return 1
+  echo "$out" | grep -q '900002' || return 1
+  echo "$out" | grep -qw 'web' || return 1
+  echo "$out" | grep -Eq '55([.]0+)?|55.00' || return 1
+}
+
+check_g5_null_channel() {
+  # Pre-evolution row that was NOT updated should allow NULL channel
+  local out
+  out="$(paimon_sql <<'SQL'
+SELECT order_id,
+       CASE WHEN channel IS NULL THEN 'IS_NULL' ELSE CAST(channel AS STRING) END AS channel_chk
+FROM ods.ods_orders
+WHERE order_id = 2;
+SQL
+)" || return 1
+  echo "$out" | grep -q 'IS_NULL' || return 1
+}
+
+if ! wait_until "$CDC_WAIT_TIMEOUT" "ods_orders order_id=1 channel=app" check_g5_channel_app; then
+  out="$(ods_orders_query_channel 1 2>/dev/null || true)"
+  fail_case G5 "schema evolution" "expected order_id=1 channel=app" "$out"
+fi
+
+if ! wait_until "$CDC_WAIT_TIMEOUT" "ods_orders order_id=900002 channel=web" check_g5_channel_web; then
+  out="$(ods_orders_query_channel 900002 2>/dev/null || true)"
+  fail_case G5 "schema evolution" "expected order_id=900002 channel=web amount=55.00" "$out"
+fi
+
+if ! wait_until "$CDC_WAIT_TIMEOUT" "ods_orders order_id=2 channel NULL (pre-evolution)" check_g5_null_channel; then
+  out="$(ods_orders_query_channel 2 2>/dev/null || true)"
+  fail_case G5 "schema evolution" "expected order_id=2 channel NULL" "$out"
+fi
+
+if ! flink_job_is_running "$PIPELINE_JOB_NAME"; then
+  fail_case G5 "schema evolution" "pipeline not RUNNING after G5 DML sync"
+fi
+
+G5_1="$(ods_orders_query_channel 1)"
+G5_2="$(ods_orders_query_channel 2)"
+G5_NEW="$(ods_orders_query_channel 900002)"
+echo "order_id=1: $G5_1"
+echo "order_id=2 (pre-evolution NULL channel): $G5_2"
+echo "order_id=900002: $G5_NEW"
+
+{
+  echo "G5 Schema Evolution ADD COLUMN channel"
+  echo "mode=explicit_migration (Flink SQL mysql-cdc fixed schema; see docs/schema-evolution.md)"
+  echo "MySQL ALTER while pipeline RUNNING → Paimon ALTER ADD → resubmit evolved SQL"
+  echo "order_id=1 channel=app:"
+  echo "$G5_1"
+  echo "order_id=2 channel=NULL:"
+  echo "$G5_2"
+  echo "order_id=900002 channel=web:"
+  echo "$G5_NEW"
+  echo "pipeline=RUNNING"
+  echo "PASS"
+} >"$EVIDENCE_DIR/g5_schema_evolution.txt"
+
+pass_case G5 "schema evolution"
 
 print_summary
 exit 0

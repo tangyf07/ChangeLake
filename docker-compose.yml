@@ -1,4 +1,4 @@
-# ChangeLake Phase 2 — MySQL + Flink JM/TM + MinIO (Paimon S3 warehouse)
+# ChangeLake Phase 3 — MySQL + Flink JM/TM + MinIO (Paimon S3 warehouse)
 # CDC jars (flink-sql-connector-mysql-cdc + mysql-connector-j + paimon-s3) from ./flink/lib
 # via container entrypoint. Pipeline started by scripts/start_pipeline.sh.
 # Demo credentials only — see README / .env.example.

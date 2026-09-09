@@ -1,8 +1,9 @@
--- ChangeLake Phase 3: submit MySQL CDC → Paimon ODS (streaming statement set)
--- Pipeline name: changelake-ods-cdc
--- Runtime: streaming; checkpoint interval inherited from cluster (~30s)
--- Phase 3: this file is the *baseline* (no channel). After G5 migration use
--- submit_ods_pipeline_evolved.sql (does not DROP ODS; includes channel).
+-- ChangeLake Phase 3: CDC → Paimon ODS AFTER schema evolution (channel present)
+-- Does NOT drop existing ODS tables (preserves lake data / evolved schema).
+-- Flink SQL mysql-cdc has a FIXED table schema at submit time — transparent
+-- runtime ADD COLUMN is NOT supported on this connector (Pipeline YAML only).
+-- Explicit migration: ALTER MySQL + ALTER Paimon + resubmit this job.
+-- Docs: docs/schema-evolution.md
 
 SET 'pipeline.name' = 'changelake-ods-cdc';
 SET 'execution.runtime-mode' = 'streaming';
@@ -10,9 +11,6 @@ SET 'execution.checkpointing.interval' = '30s';
 SET 'table.exec.sink.upsert-materialize' = 'NONE';
 SET 'parallelism.default' = '1';
 
--- Session-scoped: CREATE CATALOG every submit (Flink has no IF NOT EXISTS for catalogs).
--- MinIO S3 warehouse (demo-only keys; match .env.example). Docs:
--- https://paimon.apache.org/docs/1.4/maintenance/filesystems/
 CREATE CATALOG paimon WITH (
   'type' = 'paimon',
   'warehouse' = 's3://changelake/warehouse',
@@ -25,12 +23,12 @@ CREATE CATALOG paimon WITH (
 USE CATALOG paimon;
 CREATE DATABASE IF NOT EXISTS ods;
 
--- Recreate ODS sinks for a clean current-state mirror (demo-friendly)
-DROP TABLE IF EXISTS ods.ods_users;
-DROP TABLE IF EXISTS ods.ods_orders;
-DROP TABLE IF EXISTS ods.ods_order_items;
+-- Ensure channel exists on ods_orders (Paimon ADD COLUMN). Failures if already
+-- present are handled by scripts/schema_evolution.sh before submit when needed.
+-- Here we only CREATE IF NOT EXISTS for a cold start that already has channel
+-- in MySQL (rare); normal G5 path ALTERs first then submits.
 
-CREATE TABLE ods.ods_users (
+CREATE TABLE IF NOT EXISTS ods.ods_users (
   user_id BIGINT,
   username STRING,
   city STRING,
@@ -42,20 +40,21 @@ CREATE TABLE ods.ods_users (
   'changelog-producer' = 'input'
 );
 
-CREATE TABLE ods.ods_orders (
+CREATE TABLE IF NOT EXISTS ods.ods_orders (
   order_id BIGINT,
   user_id BIGINT,
   status STRING,
   amount DECIMAL(12, 2),
   order_ts TIMESTAMP(0),
   updated_at TIMESTAMP(0),
+  channel STRING,
   PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
   'bucket' = '1',
   'changelog-producer' = 'input'
 );
 
-CREATE TABLE ods.ods_order_items (
+CREATE TABLE IF NOT EXISTS ods.ods_order_items (
   item_id BIGINT,
   order_id BIGINT,
   product_id BIGINT,
@@ -95,6 +94,7 @@ CREATE TABLE mysql_users (
   'scan.startup.mode' = 'initial'
 );
 
+-- Evolved source schema: channel included (must match MySQL after ALTER)
 CREATE TABLE mysql_orders (
   order_id BIGINT,
   user_id BIGINT,
@@ -102,6 +102,7 @@ CREATE TABLE mysql_orders (
   amount DECIMAL(12, 2),
   order_ts TIMESTAMP(0),
   updated_at TIMESTAMP(0),
+  channel STRING,
   PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
   'connector' = 'mysql-cdc',
@@ -141,7 +142,7 @@ BEGIN STATEMENT SET;
 INSERT INTO paimon.ods.ods_users
   SELECT user_id, username, city, created_at, updated_at FROM mysql_users;
 INSERT INTO paimon.ods.ods_orders
-  SELECT order_id, user_id, status, amount, order_ts, updated_at FROM mysql_orders;
+  SELECT order_id, user_id, status, amount, order_ts, updated_at, channel FROM mysql_orders;
 INSERT INTO paimon.ods.ods_order_items
   SELECT item_id, order_id, product_id, qty, unit_price, updated_at FROM mysql_order_items;
 END;

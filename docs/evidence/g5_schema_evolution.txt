@@ -1,0 +1,17 @@
+G5 Schema Evolution — evidence stub
+Status: NOT RUN on this commit authoring host (no Docker E2E here).
+Fill by local run:
+
+  bash scripts/smoke_storage.sh
+  bash scripts/demo_golden_path.sh
+
+Expect the demo script to overwrite this file with:
+  - MySQL ALTER ADD COLUMN channel while pipeline RUNNING
+  - Paimon ALTER ADD channel + evolved job resubmit
+  - order_id=1 channel=app
+  - order_id=2 channel=NULL
+  - order_id=900002 channel=web
+  - pipeline=RUNNING
+  - PASS
+
+Mode: explicit_migration (Flink SQL mysql-cdc fixed schema; see docs/schema-evolution.md)

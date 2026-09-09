@@ -49,8 +49,10 @@ SQL
 
 echo "$out"
 
-if ! echo "$out" | grep -q 'minio-ok'; then
-  echo "[smoke_storage] FAIL: did not read back probe row from Paimon/MinIO" >&2
+# D1: require a SELECT result row (tableau), not merely the INSERT VALUES text
+if ! echo "$out" | grep -E '\|\s*1\s*\|\s*minio-ok\s*\|'; then
+  echo "[smoke_storage] FAIL: did not read back probe row (id=1, note=minio-ok) from Paimon/MinIO" >&2
+  echo "$out" >&2
   exit 2
 fi
 

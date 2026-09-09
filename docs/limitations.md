@@ -1,6 +1,7 @@
-# Limitations (Phase 2)
+# Limitations (Phase 3)
 
-ChangeLake Phase 2 delivers **MySQL → Flink CDC → Paimon ODS** for Golden Path **G1–G4** only.
+ChangeLake Phase 3 delivers **MySQL → Flink CDC → Paimon ODS** for Golden Path **G1–G5**
+(including schema evolution via **explicit migration**).
 
 ## Architecture Decision (storage)
 
@@ -12,7 +13,7 @@ Paimon warehouse is **MinIO (S3-compatible)**, not `file:///warehouse`.
   (not moved to S3 in this phase).
 - Demo MinIO keys (`minioadmin` / `minioadmin`) are **demo-only**.
 
-## What Phase 2 includes
+## What Phase 3 includes
 
 - Docker Compose: MySQL 8.0.40 + Flink 1.18.1 JobManager/TaskManager + MinIO
 - Deterministic seed (`seed=42`): `users=20` / `orders=50` / `order_items=85`
@@ -20,18 +21,24 @@ Paimon warehouse is **MinIO (S3-compatible)**, not `file:///warehouse`.
 - JAR `paimon-s3-1.4.2.jar` for S3 filesystem access
 - ODS current-state mirror: `ods_users`, `ods_orders`, `ods_order_items`
 - Storage smoke: `scripts/smoke_storage.sh` (Flink → Paimon → MinIO) before G1
-- Automated Golden Path **G1–G4** (`scripts/demo_golden_path.sh`)
-- Mutation helpers for INSERT / UPDATE / DELETE (`order_id=900001`)
+- Automated Golden Path **G1–G5** (`scripts/demo_golden_path.sh`)
+- Schema evolution **ADD COLUMN channel** via explicit migration
+  (`scripts/schema_evolution.sh`, `docs/schema-evolution.md`)
+- Mutation helpers for INSERT / UPDATE / DELETE / schema evolution
 - Flink UI via `FLINK_UI_PORT` (default `8081`; conflict example `18081`)
 - Works without GNU Make (`bash` + `docker compose`)
 
-## What Phase 2 does **not** include
+## What Phase 3 does **not** include
 
-- **G5–G10** (schema evolution, failure recovery, backfill, time travel, reconcile suite, compaction)
+- **G6–G10** (failure recovery, backfill, time travel, reconcile suite, compaction)
 - DWD / ADS business metrics
 - Kafka / HDFS / Hive / Airflow / Kubernetes / Prometheus / Grafana / Web UI / LLM
+- Flink CDC **Pipeline YAML** auto schema evolution (we stay on Flink SQL STATEMENT SET)
+- Transparent runtime DDL on Flink SQL `mysql-cdc` (not available — see support matrix)
+- `DROP` / `RENAME` / type-change DDL (not tested)
+- Optional second evolution `coupon_amount` (deferred)
 - Production HA, multi-region, enterprise catalog/lineage
-- Flink checkpoints on S3 (named volume only; Phase 6+)
+- Flink checkpoints on S3 (named volume only)
 - **Exactly-Once End-to-End** claims beyond documented Flink checkpoint + Paimon PK merge semantics
 
 ## Pinned versions & CDC support matrix
@@ -49,34 +56,39 @@ Paimon warehouse is **MinIO (S3-compatible)**, not `file:///warehouse`.
 
 CDC docs: [Flink CDC 3.1 MySQL source](https://nightlies.apache.org/flink/flink-cdc-docs-release-3.1/docs/connectors/flink-sources/mysql-cdc/)  
 Paimon docs: [Paimon 1.4 Flink Quick Start](https://paimon.apache.org/docs/1.4/flink/quick-start/)  
-Paimon S3/MinIO: [Filesystems](https://paimon.apache.org/docs/1.4/maintenance/filesystems/)
+Paimon S3/MinIO: [Filesystems](https://paimon.apache.org/docs/1.4/maintenance/filesystems/)  
+Paimon ALTER: [SQL Alter](https://paimon.apache.org/docs/1.4/flink/sql-alter/)  
+Schema evolution design: [`schema-evolution.md`](schema-evolution.md)
 
 ### Verified in this phase (by design / script)
 
 | Capability | Status |
 | --- | --- |
 | MinIO healthy + bucket | compose health + `minio-init` / `scripts/minio_init.sh` |
-| Flink → Paimon → MinIO write/read | `smoke_storage` (scripted) |
+| Flink → Paimon → MinIO write/read | `smoke_storage` (scripted; asserts SELECT row) |
 | Initial Snapshot → ODS counts | G1 (scripted) |
 | INSERT propagation | G2 (scripted) |
 | UPDATE → single current-state row | G3 (scripted) |
 | DELETE → row absent in current-state query | G4 (scripted) |
-| ADD COLUMN / schema evolution | **Not in Phase 2** |
-| TM kill + recovery | **Not in Phase 2** |
+| ADD COLUMN channel (explicit migration) | G5 (scripted) |
+| Transparent SQL-CDC DDL without resubmit | **Not supported / not claimed** |
+| TM kill + recovery | **Not in Phase 3** |
 
-Local Docker E2E must be run on a machine with Docker; CI / authoring agents do not claim full CDC E2E.
+Local Docker E2E must be run on a machine with Docker; CI / authoring agents do not claim full CDC E2E unless evidence files are filled by a local run.
 
 ## Semantics boundaries (do not over-claim)
 
 - ODS tables are **current-state mirrors** (Paimon PK + `deduplicate`), not append-only CDC logs.
-- Recovery correctness after TaskManager failure is **not** proven in Phase 2.
+- Schema evolution for ADD COLUMN uses **job resubmit with evolved Flink SQL**, not Pipeline YAML auto-DDL.
+- Recovery correctness after TaskManager failure is **not** proven in Phase 3.
 - Demo credentials only (see `.env.example`), including MinIO `minioadmin`/`minioadmin`.
 - Dataset is synthetic and laptop-scale.
-- `start_pipeline.sh` drops/recreates ODS tables on each start (demo-friendly; not a production migration tool).
+- Baseline `start_pipeline.sh` drops/recreates ODS tables on each fresh start (demo-friendly).
+  G5 evolved submit does **not** drop ODS (preserves lake + ADD COLUMN).
 
 ## Runtime notes
 
 - If `Bind for 0.0.0.0:8081 failed`: set `FLINK_UI_PORT=18081` (or free port) in `.env`, then `docker compose up -d`.
-- After downloading new jars (especially `paimon-s3`), restart JM/TM so `/jars` is copied into `/opt/flink/lib` (`start_pipeline.sh` / `smoke_storage.sh` do this when missing).
-- Recommended order: **MinIO healthy + bucket → `smoke_storage` PASS → Golden Path G1→G2→G4**.
+- After downloading new jars (especially `paimon-s3`), restart JM/TM so `/jars` is copied into `/opt/flink/lib`.
+- Recommended order: **MinIO healthy + bucket → `smoke_storage` PASS → Golden Path G1→G5**.
 - No `make`? Use the bash equivalents in README Quickstart.
