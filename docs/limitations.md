@@ -94,6 +94,7 @@ Schema evolution design: [`schema-evolution.md`](schema-evolution.md)
 | Date-scoped backfill + idempotent fingerprint | G7 / `verify_backfill` (scripted) |
 | Paimon snapshot time travel (dedicated demo table) | G8 / `time_travel` (scripted) |
 | MySQL ↔ ODS reconcile (counts + DECIMAL amounts) | G9 / `reconcile` (scripted) |
+| Paimon compaction demo (dedicated table, fingerprint gate) | G10 / `compaction` (scripted) |
 | EO-2PC / Exactly-Once E2E | **Not claimed** |
 
 Local Docker E2E must be run on a machine with Docker; CI / authoring agents do not claim full CDC E2E unless evidence files are filled by a local run.
@@ -107,6 +108,7 @@ Local Docker E2E must be run on a machine with Docker; CI / authoring agents do 
 - G7 backfill repairs **one logical `dt`** from MySQL into DWD/ADS; it is **not** EO-2PC and **not** a general orchestrator.
 - G8 time travel is a **snapshot-id demo** on `ods.ods_tt_demo`; it is **not** EO-2PC and **not** continuous CDC time travel on the live ODS job.
 - G9 reconcile is a **current-state demo check** (MySQL ↔ ODS; DECIMAL tol 0.01); it is **not** continuous monitoring and **not** EO-2PC.
+- G10 compaction is a **demo** on `ods.ods_compact_demo` (write-only small batches + `CALL sys.compact` full); hard gate is **fingerprint identity**; file-count drop is soft; **not** a production sizing/latency SLA and **not** EO-2PC.
 - NULL `channel` in DWD is mapped to ADS literal **`unknown`** (see `docs/dwd-ads.md`).
   For G9 ODS amount-by-channel, NULL is kept **as NULL** (not remapped to `unknown`).
 - Demo credentials only (see `.env.example`), including MinIO `minioadmin`/`minioadmin`.
@@ -118,5 +120,5 @@ Local Docker E2E must be run on a machine with Docker; CI / authoring agents do 
 
 - If `Bind for 0.0.0.0:8081 failed`: set `FLINK_UI_PORT=18081` (or free port) in `.env`, then `docker compose up -d`.
 - After downloading new jars (especially `paimon-s3`), restart JM/TM so `/jars` is copied into `/opt/flink/lib`.
-- Recommended order: **MinIO healthy + bucket → `smoke_storage` PASS → Golden Path G1→G6 → P5 → G7 → G8 → G9**.
+- Recommended order: **MinIO healthy + bucket → `smoke_storage` PASS → Golden Path G1→G6 → P5 → G7 → G8 → G9 → G10**.
 - No `make`? Use the bash equivalents in README Quickstart.

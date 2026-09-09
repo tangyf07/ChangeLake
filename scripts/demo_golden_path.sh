@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ChangeLake Phase 8 Golden Path: G1–G6 + P5 DWD/ADS + G7 Backfill + G8 Time Travel + G9 Reconcile (not G10).
+# ChangeLake Phase 9 Golden Path: G1–G6 + P5 DWD/ADS + G7 Backfill + G8 Time Travel + G9 Reconcile + G10 Compaction.
 # Output format: spec §22. Hard fail → exit 2 (never WARNING-and-continue).
 set -euo pipefail
 
@@ -20,6 +20,7 @@ P5_STATUS=PENDING
 G7_STATUS=PENDING
 G8_STATUS=PENDING
 G9_STATUS=PENDING
+G10_STATUS=PENDING
 
 fail_case() {
   local id="$1"
@@ -38,6 +39,7 @@ fail_case() {
     G7) G7_STATUS=FAIL ;;
     G8) G8_STATUS=FAIL ;;
     G9) G9_STATUS=FAIL ;;
+    G10) G10_STATUS=FAIL ;;
   esac
   print_summary
   exit 2
@@ -58,6 +60,7 @@ pass_case() {
     G7) G7_STATUS=PASS ;;
     G8) G8_STATUS=PASS ;;
     G9) G9_STATUS=PASS ;;
+    G10) G10_STATUS=PASS ;;
   esac
 }
 
@@ -65,7 +68,7 @@ print_summary() {
   cat <<SUM
 
 ==================================================
-ChangeLake Golden Path (Phase 8: G1–G6 + P5 + G7 + G8 + G9)
+ChangeLake Golden Path (Phase 9: G1–G6 + P5 + G7 + G8 + G9 + G10)
 ==================================================
 
 G1  Initial Snapshot       ${G1_STATUS}
@@ -78,10 +81,11 @@ P5  DWD + ADS              ${P5_STATUS}
 G7  Backfill               ${G7_STATUS}
 G8  Time Travel            ${G8_STATUS}
 G9  Reconcile              ${G9_STATUS}
+G10 Compaction             ${G10_STATUS}
 
 SUM
-  if [[ "$G1_STATUS" == PASS && "$G2_STATUS" == PASS && "$G3_STATUS" == PASS && "$G4_STATUS" == PASS && "$G5_STATUS" == PASS && "$G6_STATUS" == PASS && "$P5_STATUS" == PASS && "$G7_STATUS" == PASS && "$G8_STATUS" == PASS && "$G9_STATUS" == PASS ]]; then
-    echo "ALL PASS (G1–G6 + P5 + G7 + G8 + G9)"
+  if [[ "$G1_STATUS" == PASS && "$G2_STATUS" == PASS && "$G3_STATUS" == PASS && "$G4_STATUS" == PASS && "$G5_STATUS" == PASS && "$G6_STATUS" == PASS && "$P5_STATUS" == PASS && "$G7_STATUS" == PASS && "$G8_STATUS" == PASS && "$G9_STATUS" == PASS && "$G10_STATUS" == PASS ]]; then
+    echo "ALL PASS (G1–G6 + P5 + G7 + G8 + G9 + G10)"
   else
     echo "FAILED"
   fi
@@ -105,7 +109,7 @@ wait_until() {
 }
 
 # --- Preconditions ---
-echo "[demo] ChangeLake Phase 8 Golden Path G1–G6 + P5 + G7 + G8 + G9"
+echo "[demo] ChangeLake Phase 9 Golden Path G1–G6 + P5 + G7 + G8 + G9 + G10"
 echo "[demo] Flink UI port: ${FLINK_UI_PORT} → $(flink_ui)"
 bash "$ROOT/scripts/wait_services.sh"
 
@@ -454,7 +458,7 @@ fi
 pass_case G8 "time travel"
 
 # ==================================================
-# G9 Reconcile (Phase 8 — not G10)
+# G9 Reconcile (Phase 8)
 # ==================================================
 echo
 echo "=================================================="
@@ -466,6 +470,20 @@ if ! bash "$ROOT/scripts/reconcile.sh"; then
 fi
 
 pass_case G9 "reconcile"
+
+# ==================================================
+# G10 Compaction (Phase 9)
+# ==================================================
+echo
+echo "=================================================="
+echo "[G10] Compaction"
+echo "=================================================="
+
+if ! bash "$ROOT/scripts/compaction.sh"; then
+  fail_case G10 "compaction" "see scripts/compaction.sh / docs/evidence/g10_compaction.txt"
+fi
+
+pass_case G10 "compaction"
 
 print_summary
 exit 0

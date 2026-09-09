@@ -2,15 +2,14 @@
 
 可复现的 CDC 增量湖仓演示：**MySQL → Flink CDC → Apache Paimon (MinIO)**。
 
-> **当前仓库状态：Phase 8（Reconcile / G9）**  
+> **当前仓库状态：Phase 9（Compaction / G10）**  
 > Flink SQL `mysql-cdc` → Paimon ODS → **DWD** `dwd_orders` → **ADS** `ads_order_daily`（MinIO S3）。  
-> Golden Path **G1–G6 + P5 + G7 + G8 + G9**（含日期范围幂等 Backfill + Paimon snapshot time travel + source↔lake reconcile）。  
-> **尚未**实现 G10 Compaction。  
-> **不声称** EO-2PC / Exactly-Once E2E / 连续监控式 Reconcile / 连续流式 ADS / 通用 Backfill 编排器 / 生产级快照保留 SLA。
+> Golden Path **G1–G6 + P5 + G7 + G8 + G9 + G10**（含日期范围幂等 Backfill + Paimon snapshot time travel + source↔lake reconcile + **demo compaction**）。  
+> **不声称** EO-2PC / Exactly-Once E2E / 连续监控式 Reconcile / 连续流式 ADS / 通用 Backfill 编排器 / 生产级快照保留 SLA / **生产级 Compaction 容量或延迟 SLA**。
 
 ## Why
 
-业务库里的可变关系数据，如何通过 CDC 进入现代湖仓，并在 UPDATE / DELETE / **DDL** / **TM 故障**后仍保持当前状态正确，再冻结 DWD 语义并产出 ADS 日指标，对历史错误日做 **分区级 Backfill**，用 Paimon **Snapshot Time Travel** 回看 INSERT→UPDATE→DELETE，最后用 **G9 Reconcile** 核对 MySQL↔ODS 行数与金额——Phase 8 在 G1–G6 + P5 + G7 + G8 基础上加入 G9（DECIMAL 容差 0.01；当前状态演示核对，非连续监控 / 非 EO-2PC）。
+业务库里的可变关系数据，如何通过 CDC 进入现代湖仓，并在 UPDATE / DELETE / **DDL** / **TM 故障**后仍保持当前状态正确，再冻结 DWD 语义并产出 ADS 日指标，对历史错误日做 **分区级 Backfill**，用 Paimon **Snapshot Time Travel** 回看 INSERT→UPDATE→DELETE，用 **G9 Reconcile** 核对 MySQL↔ODS，最后在专用表上做 **G10 Compaction**（小文件合并后查询指纹不变）——Phase 9 在 G1–G6 + P5 + G7 + G8 + G9 基础上加入 G10（演示级 compaction；硬门禁是数据指纹一致，文件数下降为软期望；非生产容量/延迟 SLA / 非 EO-2PC）。
 
 ## Architecture Decision (storage)
 
@@ -20,7 +19,7 @@
 
 **原因：** Docker Desktop 本地 FS / VirtioFS 上 Paimon `Mkdirs failed`；对象存储避开该类本地 mkdir 问题。Flink checkpoint 仍用 named volume（G6 依赖 `/checkpoints` 在 TM kill 后仍可读）。
 
-## Architecture (Phase 8)
+## Architecture (Phase 9)
 
 ```text
 MySQL 8.0.40 (ROW binlog + GTID)
@@ -39,6 +38,7 @@ Paimon 1.4.2 PK tables  (paimon-s3-1.4.2.jar)
   G7 backfill: MySQL(dt) → replace DWD/ADS for that dt (bypass CDC)
   G8 time travel: ods.ods_tt_demo snapshots (S1/S2/S3) via scan.snapshot-id
   G9 reconcile: MySQL ↔ ODS counts + SUM(amount) (total / dt / dt+channel)
+  G10 compaction: ods.ods_compact_demo (write-only batches → CALL sys.compact full)
 ```
 
 Named volumes: `changelake_mysql_data`, `changelake_minio_data`,
@@ -66,10 +66,11 @@ Named volumes: `changelake_mysql_data`, `changelake_minio_data`,
 - Backfill / G7: [`docs/backfill.md`](docs/backfill.md)
 - Time Travel / G8: [`docs/time-travel.md`](docs/time-travel.md)
 - Reconcile / G9: [`docs/reconcile.md`](docs/reconcile.md)
+- Compaction / G10: [`docs/compaction.md`](docs/compaction.md)
 
 ## Quickstart
 
-推荐运行顺序：**up → MinIO healthy/bucket → smoke_storage → demo_golden_path (G1→G6→P5→G7→G8→G9)**。
+推荐运行顺序：**up → MinIO healthy/bucket → smoke_storage → demo_golden_path (G1→G6→P5→G7→G8→G9→G10)**。
 
 ```bash
 cp .env.example .env          # demo credentials only (incl. MinIO minioadmin/minioadmin)
@@ -79,7 +80,7 @@ bash scripts/bootstrap.sh --jars-only
 docker compose up -d
 bash scripts/wait_services.sh
 bash scripts/smoke_storage.sh          # Flink → Paimon → MinIO MUST PASS
-bash scripts/demo_golden_path.sh       # G1→G6→P5→G7→G8→G9
+bash scripts/demo_golden_path.sh       # G1→G6→P5→G7→G8→G9→G10
 ```
 
 有 GNU Make 时：
@@ -175,6 +176,20 @@ bash scripts/reconcile.sh
 
 期望：`[G9] PASS reconcile`；证据 `docs/evidence/g9_reconcile.txt` + `docs/evidence/source_reconcile_report.{csv,json}`（`reports/` 有镜像）。
 
+### Compaction / G10 (Phase 9)
+
+专用表 `ods.ods_compact_demo`：`write-only=true` 下**分块**多批小写入（默认 30×100=3k 行，每 session 1 条 INSERT via `sql-client -f`）→ 等待 `COUNT(*)` → 记录 Before 统计与指纹 → Flink 1.18 `CALL sys.compact(..., 'full')` → After 统计与指纹。
+**硬门禁**：查询结果指纹（ordered row dump SHA256）前后一致。**软期望**：`$files` 文件数下降（嘈杂时只记证据，不硬失败）。延迟仅记录，**不**要求百分比下降。
+
+```bash
+bash scripts/compaction.sh
+# 或: make compaction
+# 或: bash scripts/verify_compaction.sh
+```
+
+期望：`[G10] PASS compaction`；证据 `docs/evidence/g10_compaction.txt`。详见 [`docs/compaction.md`](docs/compaction.md)。
+
+
 ### Storage smoke
 
 ```bash
@@ -184,7 +199,7 @@ bash scripts/smoke_storage.sh
 
 期望：`[smoke_storage] PASS Flink → Paimon → MinIO write/read`（断言 **SELECT 结果行**含 `minio-ok`）。
 
-### Golden Path G1–G6 + P5 + G7 + G8 + G9
+### Golden Path G1–G6 + P5 + G7 + G8 + G9 + G10
 
 ```bash
 bash scripts/demo_golden_path.sh
@@ -204,7 +219,8 @@ bash scripts/demo_golden_path.sh
 [G7] PASS backfill
 [G8] PASS time travel
 [G9] PASS reconcile
-ALL PASS (G1–G6 + P5 + G7 + G8 + G9)
+[G10] PASS compaction
+ALL PASS (G1–G6 + P5 + G7 + G8 + G9 + G10)
 ```
 
 任一失败：`exit 2`（不会仅 WARNING 后继续）。
@@ -221,8 +237,9 @@ ALL PASS (G1–G6 + P5 + G7 + G8 + G9)
 | G7 | 腐蚀 DWD → `backfill` ×2 → fingerprint 相等 + reconcile（默认 `BACKFILL_DT=2026-08-13`） |
 | G8 | `ods.ods_tt_demo`：S1 amount=100 → S2 amount=200 → S3 DELETE；按 snapshot-id 回看 |
 | G9 | MySQL ↔ ODS 行数 + `SUM(amount)`（total / dt / dt+channel）；DECIMAL tol 0.01；报告 CSV/JSON |
+| G10 | `ods.ods_compact_demo`：多批小写入 → `CALL sys.compact` full；指纹前后一致（硬）；文件数通常下降（软） |
 
-Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`、`dwd_ads.txt`、`g7_backfill.txt`、`g8_time_travel.txt`、`g9_reconcile.txt`、`source_reconcile_report.*`（由 demo / verify 写入；未跑 Docker 时为 NOT RUN stub）。
+Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`、`dwd_ads.txt`、`g7_backfill.txt`、`g8_time_travel.txt`、`g9_reconcile.txt`、`g10_compaction.txt`、`source_reconcile_report.*`（由 demo / verify 写入；未跑 Docker 时为 NOT RUN stub）。
 
 ### Schema evolution support matrix (honest)
 
@@ -246,7 +263,7 @@ Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`、`dwd_ads.txt`、`g7_backfil
 
 金额均为 `DECIMAL(12,2)`。重新灌数：`make seed` / `bash scripts/seed.sh`。
 
-## Guarantees (Phase 8)
+## Guarantees (Phase 9)
 
 ```text
 MinIO warehouse for Paimon (scripted smoke)
@@ -259,10 +276,11 @@ DWD order semantic freeze + ADS daily metrics vs MySQL (scripted P5)
 Date-scoped backfill + idempotent fingerprint (scripted G7)
 Paimon snapshot time travel on dedicated demo table (scripted G8)
 MySQL ↔ ODS current-state reconcile, DECIMAL tol 0.01 (scripted G9)
-Automated Golden Path G1–G6 + P5 + G7 + G8 + G9
+Paimon demo compaction on dedicated table; fingerprint gate (scripted G10)
+Automated Golden Path G1–G6 + P5 + G7 + G8 + G9 + G10
 ```
 
-**Not claimed:** Exactly-Once E2E / **EO-2PC**、连续监控式 Reconcile、连续流式 ADS、透明 SQL-CDC DDL、G10 Compaction、通用 Backfill 编排器、`coupon_amount` CDC、生产 HA/SLA / 快照保留 SLA、checkpoint-on-S3、Pipeline YAML auto schema sync、连续 CDC 作业上的 time travel。
+**Not claimed:** Exactly-Once E2E / **EO-2PC**、连续监控式 Reconcile、连续流式 ADS、透明 SQL-CDC DDL、**生产级 Compaction 容量/延迟 SLA**、通用 Backfill 编排器、`coupon_amount` CDC、生产 HA/SLA / 快照保留 SLA、checkpoint-on-S3、Pipeline YAML auto schema sync、连续 CDC 作业上的 time travel / compaction。
 
 ## Credentials
 
@@ -270,7 +288,7 @@ Automated Golden Path G1–G6 + P5 + G7 + G8 + G9
 
 ## Limitations
 
-详见 [`docs/limitations.md`](docs/limitations.md)。语义：[`docs/semantics.md`](docs/semantics.md)。架构：[`docs/architecture.md`](docs/architecture.md)。Schema Evolution：[`docs/schema-evolution.md`](docs/schema-evolution.md)。Failure Recovery：[`docs/failure-recovery.md`](docs/failure-recovery.md)。DWD/ADS：[`docs/dwd-ads.md`](docs/dwd-ads.md)。Backfill：[`docs/backfill.md`](docs/backfill.md)。Time Travel：[`docs/time-travel.md`](docs/time-travel.md)。Reconcile：[`docs/reconcile.md`](docs/reconcile.md)。
+详见 [`docs/limitations.md`](docs/limitations.md)。语义：[`docs/semantics.md`](docs/semantics.md)。架构：[`docs/architecture.md`](docs/architecture.md)。Schema Evolution：[`docs/schema-evolution.md`](docs/schema-evolution.md)。Failure Recovery：[`docs/failure-recovery.md`](docs/failure-recovery.md)。DWD/ADS：[`docs/dwd-ads.md`](docs/dwd-ads.md)。Backfill：[`docs/backfill.md`](docs/backfill.md)。Time Travel：[`docs/time-travel.md`](docs/time-travel.md)。Reconcile：[`docs/reconcile.md`](docs/reconcile.md)。Compaction：[`docs/compaction.md`](docs/compaction.md)。
 
 ## Layout
 
@@ -283,13 +301,13 @@ flink/sql/paimon_catalog.sql  cdc_source.sql  ods.sql  dwd.sql  ads.sql
 flink/sql/submit_ods_pipeline.sql  submit_ods_pipeline_evolved.sql
 flink/sql/submit_dwd_pipeline.sql  submit_ads_pipeline.sql
 scripts/schema_evolution.sh  failure_recovery.sh  start_dwd_ads.sh  verify_dwd_ads.sh
-scripts/demo_golden_path.sh  time_travel.sh  verify_time_travel.sh  reconcile.sh  …
+scripts/demo_golden_path.sh  time_travel.sh  verify_time_travel.sh  reconcile.sh  compaction.sh  …
 python/reconcile_report.py
-docs/schema-evolution.md  failure-recovery.md  dwd-ads.md  backfill.md  time-travel.md  reconcile.md
-docs/evidence/g1..g9_*.txt  dwd_ads.txt  source_reconcile_report.*
+docs/schema-evolution.md  failure-recovery.md  dwd-ads.md  backfill.md  time-travel.md  reconcile.md  compaction.md
+docs/evidence/g1..g10_*.txt  dwd_ads.txt  source_reconcile_report.*
 reports/source_reconcile_report.*
 ```
 
 ## Next phases (not in this commit)
 
-Phase 9+: Compaction（G10）。
+Phase 10+: further polish / optional pytest-only packaging (out of G10 scope).

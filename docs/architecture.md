@@ -1,4 +1,4 @@
-# Architecture (Phase 8)
+# Architecture (Phase 9)
 
 ```text
 ┌──────────────────┐
@@ -98,3 +98,15 @@ Optional cheap DWD checks when `dwd.dwd_orders` is non-empty.
 
 Report: `docs/evidence/source_reconcile_report.{csv,json}` (+ `reports/` mirror).
 See [`reconcile.md`](reconcile.md). **Not** continuous monitoring / **not** EO-2PC.
+
+
+## Compaction (Phase 9 / G10)
+
+Dedicated table `ods.ods_compact_demo` is created with `'write-only' = 'true'` so insert
+batches skip writer-side compaction. G10 then runs Flink SQL
+
+`CALL sys.compact('ods.ods_compact_demo', '', '', '', 'sink.parallelism=1', '', '', 'full')`
+
+(Flink 1.18 positional procedure args; Paimon 1.4.2). Hard gate: ordered-row fingerprint
+identical before vs after. Soft expect: file count from `$files` decreases. Does **not**
+compact live golden-path ODS tables. See [`compaction.md`](compaction.md).

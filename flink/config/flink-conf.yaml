@@ -5,7 +5,7 @@ jobmanager.rpc.port: 6123
 jobmanager.memory.process.size: 1600m
 taskmanager.memory.process.size: 1728m
 taskmanager.numberOfTaskSlots: 10
-parallelism.default: 2
+parallelism.default: 1
 rest.port: 8081
 rest.address: 0.0.0.0
 rest.bind-address: 0.0.0.0
@@ -26,3 +26,8 @@ classloader.resolve-order: parent-first
 restart-strategy.type: fixed-delay
 restart-strategy.fixed-delay.attempts: 10
 restart-strategy.fixed-delay.delay: 5s
+
+# Network buffers: G10 many batch INSERTs + CDC/DWD can exhaust default pool (required 512, 0 available).
+taskmanager.memory.network.fraction: 0.25
+taskmanager.memory.network.min: 256mb
+taskmanager.memory.network.max: 512mb

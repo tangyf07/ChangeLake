@@ -1,4 +1,4 @@
-# ChangeLake Phase 8 (Reconcile / G9) — MinIO warehouse; G1–G6 + P5 + G7 + G8 + G9
+# ChangeLake Phase 9 (Compaction / G10) — MinIO warehouse; G1–G6 + P5 + G7 + G8 + G9 + G10
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
@@ -7,10 +7,10 @@ ENV_FILE := .env
 
 .PHONY: help up down reset seed jars bootstrap wait status ps logs mysql-cli flink-sql \
 	pipeline stop-pipeline demo mutate-insert mutate-update mutate-delete schema-evolution \
-	failure-recovery minio-init smoke-storage start-dwd-ads dwd-ads backfill time-travel reconcile
+	failure-recovery minio-init smoke-storage start-dwd-ads dwd-ads backfill time-travel reconcile compaction
 
 help:
-	@echo "ChangeLake Phase 8 targets:"
+	@echo "ChangeLake Phase 9 targets:"
 	@echo "  make jars            Download Paimon + paimon-s3 + Hadoop + Flink CDC + MySQL JDBC"
 	@echo "  make up              cp .env.example .env (if missing) && compose up -d"
 	@echo "  make wait            Wait until MinIO + MySQL + Flink UI are healthy"
@@ -23,13 +23,14 @@ help:
 	@echo "  make failure-recovery  G6 TM kill + checkpoint restore (pipeline must be RUNNING)"
 	@echo "  make start-dwd-ads   Submit DWD streaming + ADS batch refresh"
 	@echo "  make dwd-ads         Verify DWD + ADS metrics (scripts/verify_dwd_ads.sh)"
-	@echo "  make demo            Golden Path G1–G6 + P5 + G7 + G8 + G9 reconcile"
+	@echo "  make demo            Golden Path G1–G6 + P5 + G7 + G8 + G9 + G10 compaction"
 	@echo "  make backfill DT=... Date-scoped DWD/ADS repair (G7); requires DT=YYYY-MM-DD"
 	@echo "  make time-travel     G8 Paimon snapshot time travel (ods.ods_tt_demo)"
 	@echo "  make reconcile       G9 MySQL ↔ ODS reconcile report (DECIMAL, tol=0.01)"
+	@echo "  make compaction      G10 Paimon compaction demo (ods.ods_compact_demo)"
 	@echo "  make down / reset / status / mysql-cli / bootstrap"
 	@echo "  Note: FLINK_UI_PORT from .env (default 8081; use 18081 if busy)"
-	@echo "  Order: jars → up → wait → smoke-storage → demo  (or dwd-ads / backfill / time-travel / reconcile)"
+	@echo "  Order: jars → up → wait → smoke-storage → demo  (or dwd-ads / backfill / time-travel / reconcile / compaction)"
 
 jars:
 	bash scripts/bootstrap.sh --jars-only
@@ -118,3 +119,6 @@ time-travel:
 
 reconcile:
 	bash scripts/reconcile.sh
+
+compaction:
+	bash scripts/compaction.sh

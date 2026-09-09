@@ -124,6 +124,9 @@ services:
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 10
         parallelism.default: 1
+        taskmanager.memory.network.fraction: 0.25
+        taskmanager.memory.network.min: 256mb
+        taskmanager.memory.network.max: 512mb
         rest.bind-address: 0.0.0.0
         state.backend: hashmap
         state.checkpoints.dir: file:///checkpoints
@@ -185,6 +188,9 @@ services:
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 10
         parallelism.default: 1
+        taskmanager.memory.network.fraction: 0.25
+        taskmanager.memory.network.min: 256mb
+        taskmanager.memory.network.max: 512mb
         state.backend: hashmap
         state.checkpoints.dir: file:///checkpoints
         state.savepoints.dir: file:///savepoints

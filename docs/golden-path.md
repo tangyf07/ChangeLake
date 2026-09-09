@@ -1,14 +1,15 @@
-# Golden Path — Phase 8 (G1–G6 + P5 DWD/ADS + G7 Backfill + G8 Time Travel + G9 Reconcile)
+# Golden Path — Phase 9 (G1–G6 + P5 DWD/ADS + G7 Backfill + G8 Time Travel + G9 Reconcile + G10 Compaction)
 
 Script: `scripts/demo_golden_path.sh` (also `make demo`).
 
 **Prereq:** MinIO healthy + bucket, then `scripts/smoke_storage.sh` PASS (Flink → Paimon → MinIO).
-Order: G1 → G2 → G3 → G4 → G5 → G6 → **P5 (DWD/ADS)** → **G7 (Backfill)** → **G8 (Time Travel)** → **G9 (Reconcile)**.
+Order: G1 → G2 → G3 → G4 → G5 → G6 → **P5 (DWD/ADS)** → **G7 (Backfill)** → **G8 (Time Travel)** → **G9 (Reconcile)** → **G10 (Compaction)**.
 
 Standalone Phase 5 check: `bash scripts/verify_dwd_ads.sh` / `make dwd-ads`.  
 Standalone G7 check: `bash scripts/verify_backfill.sh` / `make backfill DT=2026-08-13`.  
 Standalone G8 check: `bash scripts/time_travel.sh` / `make time-travel`.  
-Standalone G9 check: `bash scripts/reconcile.sh` / `make reconcile`.
+Standalone G9 check: `bash scripts/reconcile.sh` / `make reconcile`.  
+Standalone G10 check: `bash scripts/compaction.sh` / `make compaction`.
 
 | Case | Action | Pass criteria |
 | --- | --- | --- |
@@ -22,6 +23,7 @@ Standalone G9 check: `bash scripts/reconcile.sh` / `make reconcile`.
 | G7 | `verify_backfill.sh` | Corrupt DWD for `BACKFILL_DT` → backfill ×2 → `fingerprint(run1)==fingerprint(run2)` + reconcile; `[G7] PASS backfill` |
 | G8 | `time_travel.sh` | Dedicated `ods.ods_tt_demo`: S1 amount=100 → S2 amount=200 → S3 DELETE; query each `scan.snapshot-id`; `[G8] PASS time travel` |
 | G9 | `reconcile.sh` | MySQL ↔ ODS counts + `SUM(amount)` (total / by dt / by dt+channel); DECIMAL tol **0.01**; report `metric source lake diff status`; `[G9] PASS reconcile` |
+| G10 | `compaction.sh` | Dedicated `ods.ods_compact_demo`: chunked small-batch writes (default 30×100) → wait `COUNT(*)` → `CALL sys.compact` (full); **fingerprint identical** before/after (hard); file count usually reduced (soft); `[G10] PASS compaction` |
 
 Hard failure → print `FAIL`, write partial evidence if any, `exit 2`. Never WARNING-and-continue.
 
@@ -40,13 +42,13 @@ docs/evidence/g8_time_travel.txt
 docs/evidence/g9_reconcile.txt
 docs/evidence/source_reconcile_report.csv
 docs/evidence/source_reconcile_report.json
+docs/evidence/g10_compaction.txt
 ```
-
-**G10** is **not** implemented in Phase 8.
 
 Schema evolution: [`schema-evolution.md`](schema-evolution.md).  
 Failure recovery: [`failure-recovery.md`](failure-recovery.md).  
 DWD/ADS: [`dwd-ads.md`](dwd-ads.md).  
 Backfill: [`backfill.md`](backfill.md).  
 Time travel: [`time-travel.md`](time-travel.md).  
-Reconcile: [`reconcile.md`](reconcile.md).
+Reconcile: [`reconcile.md`](reconcile.md).  
+Compaction: [`compaction.md`](compaction.md).
