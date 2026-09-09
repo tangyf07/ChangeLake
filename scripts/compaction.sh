@@ -179,41 +179,118 @@ print(",\n".join(parts) + ";")
 ' "$start_id" "$n" "$TABLE"
 }
 
-# After a batch INSERT session, ensure no Flink INSERT jobs are still RUNNING.
-# sql-client -f in batch mode normally blocks until FINISHED; this is a safety poll.
+# Cancel leftover G10 insert jobs (RESTARTING/RUNNING chew network buffers).
+# Also snapshot pre-existing FAILED jids so wait_insert ignores historical noise.
+G10_IGNORE_FAILED_JIDS="${G10_IGNORE_FAILED_JIDS:-/tmp/changelake_g10_ignore_failed_jids.txt}"
+
+cancel_compact_insert_jobs() {
+  : >"$G10_IGNORE_FAILED_JIDS"
+  python3 -c '
+import json, urllib.request, sys
+ui = sys.argv[1].rstrip("/")
+ignore_path = sys.argv[2]
+try:
+    data = json.load(urllib.request.urlopen(ui + "/jobs/overview", timeout=8))
+except Exception as e:
+    print(f"[g10] WARN: cannot list jobs to cancel: {e}", file=sys.stderr)
+    open(ignore_path, "w").close()
+    sys.exit(0)
+cancel_states = {"RUNNING", "RESTARTING", "CREATED", "INITIALIZING", "FAILING", "CANCELLING"}
+n = 0
+ignored = []
+for j in data.get("jobs", []):
+    name = (j.get("name") or "").lower()
+    state = (j.get("state") or "").upper()
+    jid = j.get("jid") or j.get("id")
+    if not jid:
+        continue
+    if not (
+        "ods_compact" in name
+        or "compact_demo" in name
+        or ("insert" in name and "compact" in name)
+    ):
+        continue
+    if state == "FAILED":
+        ignored.append(jid)
+        print(f"[g10] ignore pre-existing FAILED insert job {jid}")
+        continue
+    if state not in cancel_states:
+        continue
+    req = urllib.request.Request(ui + f"/jobs/{jid}?mode=cancel", method="PATCH")
+    try:
+        urllib.request.urlopen(req, timeout=8).read()
+        print(f"[g10] cancelled insert job {jid} state={state} name={name}")
+        n += 1
+    except Exception as e:
+        print(f"[g10] WARN: cancel {jid} failed: {e}", file=sys.stderr)
+with open(ignore_path, "w", encoding="utf-8") as f:
+    f.write("\n".join(ignored) + ("\n" if ignored else ""))
+print(f"[g10] cancelled {n} active compact INSERT job(s); ignoring {len(ignored)} old FAILED")
+' "$(flink_ui)" "$G10_IGNORE_FAILED_JIDS" || true
+}
+
+# After a batch INSERT session: fail hard on FAILED; wait until no active INSERT jobs.
+# Root cause previously: wait treated FAILED as idle while FixedDelayRestart chewed network buffers
+# ("Insufficient number of network buffers: required 512, but only 0 available").
 wait_insert_jobs_finished() {
   local timeout="${1:-90}"
   local deadline=$((SECONDS + timeout))
-  local active
+  local report
   while (( SECONDS < deadline )); do
-    active="$(python3 -c '
+    report="$(python3 -c '
 import json, urllib.request, sys
 ui = sys.argv[1]
+ignore_path = sys.argv[2]
+ignore = set()
+try:
+    with open(ignore_path, encoding="utf-8") as f:
+        ignore = {ln.strip() for ln in f if ln.strip()}
+except FileNotFoundError:
+    pass
 try:
     data = json.load(urllib.request.urlopen(ui + "/jobs/overview", timeout=8))
 except Exception as e:
     print(f"ERR:{e}")
     sys.exit(0)
-active_states = {"RUNNING", "RESTARTING", "CREATED", "INITIALIZING", "CANCELLING"}
-n = 0
+active_states = {"RUNNING", "RESTARTING", "CREATED", "INITIALIZING", "CANCELLING", "FAILING"}
+active = 0
+failed = []
 for j in data.get("jobs", []):
-    name = (j.get("name") or "").lower()
+    name = (j.get("name") or "")
+    low = name.lower()
     state = (j.get("state") or "").upper()
-    if state not in active_states:
+    jid = j.get("jid") or j.get("id") or "?"
+    if not ("insert" in low or "ods_compact" in low or "compact_demo" in low):
         continue
-    # Match Flink SQL insert job names; ignore CDC pipeline.
-    if "insert" in name or "ods_compact" in name or "compact_demo" in name:
-        n += 1
-print(n)
-' "$(flink_ui)" 2>/dev/null || echo 0)"
-    if [[ "$active" == ERR:* ]]; then
-      echo "[g10] WARN: Flink jobs overview unavailable (${active#ERR:}); relying on sql-client -f wait"
+    if not ("compact" in low or "ods_compact" in low):
+        # generic insert jobs from other demos — only track active by name insert+compact already filtered loosely
+        if "compact" not in low:
+            continue
+    if state in active_states:
+        active += 1
+    elif state == "FAILED" and jid not in ignore:
+        failed.append(f"{jid}:{state}:{name}")
+print(f"OK:{active}:{len(failed)}")
+for f in failed[:5]:
+    print(f"FAILJOB:{f}")
+' "$(flink_ui)" "${G10_IGNORE_FAILED_JIDS:-/tmp/changelake_g10_ignore_failed_jids.txt}" 2>/dev/null || echo "ERR:python")"
+    if [[ "$report" == ERR:* ]] || [[ "$(echo "$report" | head -1)" == ERR:* ]]; then
+      echo "[g10] WARN: Flink jobs overview unavailable; relying on sql-client -f wait"
       return 0
     fi
-    if [[ "$active" =~ ^[0-9]+$ ]] && (( active == 0 )); then
+    local head active_n fail_n
+    head="$(echo "$report" | head -1)"
+    active_n="${head#OK:}"; active_n="${active_n%%:*}"
+    fail_n="${head##*:}"
+    if [[ "$fail_n" =~ ^[0-9]+$ ]] && (( fail_n > 0 )); then
+      echo "$report" | grep '^FAILJOB:' | head -5 || true
+      cancel_compact_insert_jobs || true
+      fail "INSERT job FAILED (network buffers / Flink). See FAILJOB lines above; fix then re-run make compaction"
+    fi
+    if [[ "$active_n" =~ ^[0-9]+$ ]] && (( active_n == 0 )); then
       return 0
     fi
-    echo "[g10] waiting for INSERT job(s) FINISHED (active≈${active})"
+    echo "[g10] waiting for INSERT job(s) FINISHED (active≈${active_n})"
     sleep 2
   done
   echo "[g10] WARN: timed out waiting for INSERT jobs idle (continuing; COUNT(*) gate follows)"
@@ -271,6 +348,7 @@ CREATE TABLE ods.ods_compact_demo (
 ) WITH (
   'bucket' = '1',
   'write-only' = 'true',
+  'sink.parallelism' = '1',
   'snapshot.num-retained.min' = '10',
   'snapshot.num-retained.max' = '200',
   'file.format' = 'parquet'
@@ -286,6 +364,10 @@ if ! [[ "$COMPACT_INSERTS_PER_SESSION" =~ ^[1-9][0-9]*$ ]] || (( COMPACT_INSERTS
 fi
 echo "[g10] writing ${COMPACT_BATCHES} batches × ${COMPACT_ROWS_PER_BATCH} rows (=${EXPECTED_ROWS}; write-only → many small files)"
 echo "[g10] write path: chunked docker compose cp + sql-client -f (${COMPACT_INSERTS_PER_SESSION} INSERT(s)/session; wait FINISHED each chunk)"
+echo "[g10] session knobs: parallelism.default=1; restart-strategy=none (avoid buffer chew on fail)"
+
+# Clear leftover FAILED/RESTARTING compact inserts from prior runs (frees TM network buffers).
+cancel_compact_insert_jobs
 
 next_id=1
 batch_num=0
@@ -293,6 +375,9 @@ while (( batch_num < COMPACT_BATCHES )); do
   chunk_n=0
   WRITE_SQL="$(mktemp)"
   {
+    echo "SET 'parallelism.default' = '1';"
+    echo "SET 'table.exec.resource.default-parallelism' = '1';"
+    echo "SET 'restart-strategy.type' = 'none';"
     while (( chunk_n < COMPACT_INSERTS_PER_SESSION && batch_num < COMPACT_BATCHES )); do
       batch_insert_sql "$next_id" "$COMPACT_ROWS_PER_BATCH"
       echo
