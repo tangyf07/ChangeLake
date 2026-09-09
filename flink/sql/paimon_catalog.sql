@@ -1,11 +1,16 @@
--- ChangeLake Phase 1: Paimon filesystem catalog stub
--- Docs: https://paimon.apache.org/docs/1.4/flink/quick-start/
--- Requires: paimon-flink-1.18-1.4.2.jar (+ flink-shaded-hadoop uber) in Flink lib/
--- Warehouse path matches docker-compose volume mount.
+-- ChangeLake: Paimon catalog on MinIO (S3-compatible)
+-- Docs: https://paimon.apache.org/docs/1.4/maintenance/filesystems/
+-- Requires: paimon-flink-1.18-1.4.2.jar + paimon-s3-1.4.2.jar
+--           (+ flink-shaded-hadoop uber) in Flink lib/
+-- Demo-only keys below; keep in sync with .env.example / scripts/common.sh.
 
-CREATE CATALOG IF NOT EXISTS paimon WITH (
+CREATE CATALOG paimon WITH (
   'type' = 'paimon',
-  'warehouse' = 'file:///warehouse'
+  'warehouse' = 's3://changelake/warehouse',
+  's3.endpoint' = 'http://minio:9000',
+  's3.access-key' = 'minioadmin',
+  's3.secret-key' = 'minioadmin',
+  's3.path.style.access' = 'true'
 );
 
 USE CATALOG paimon;
@@ -13,8 +18,3 @@ USE CATALOG paimon;
 CREATE DATABASE IF NOT EXISTS ods;
 CREATE DATABASE IF NOT EXISTS dwd;
 CREATE DATABASE IF NOT EXISTS ads;
-
--- Phase 1: catalog + databases only. ODS/DWD/ADS tables land in later phases.
--- Smoke check (optional, after JAR is present):
---   SHOW DATABASES;
---   SHOW CATALOGS;

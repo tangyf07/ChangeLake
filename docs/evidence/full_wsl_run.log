@@ -1,0 +1,695 @@
+M	docker-compose.yml
+M	flink/sql/paimon_catalog.sql
+M	flink/sql/submit_ods_pipeline.sql
+M	scripts/common.sh
+M	scripts/start_pipeline.sh
+Your branch is behind 'origin/phase-2-cdc' by 16 commits, and can be fast-forwarded.
+  (use "git pull" to update your local branch)
+HEAD is now at 72e5fb7 fix(storage): replace local Paimon warehouse with MinIO
+72e5fb7 fix(storage): replace local Paimon warehouse with MinIO
+FLINK_UI_PORT=18081
+# MinIO (S3-compatible) — DEMO-ONLY keys. Never use in production.
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin
+MINIO_API_PORT=9000
+MINIO_CONSOLE_PORT=9001
+MINIO_ENDPOINT=http://minio:9000
+MINIO_BUCKET=changelake
+S3_PATH_STYLE_ACCESS=true
+PAIMON_WAREHOUSE=s3://changelake/warehouse
+PAIMON_VERSION=1.4.2
+[bootstrap] Paimon 1.4.2 for Flink 1.18 (+ paimon-s3 for MinIO)
+[bootstrap] Flink CDC mysql-cdc 3.1.1 + MySQL JDBC 8.0.33
+[bootstrap] Paimon docs: https://paimon.apache.org/docs/1.4/flink/quick-start/
+[bootstrap] S3/MinIO:    https://paimon.apache.org/docs/1.4/maintenance/filesystems/
+[bootstrap] CDC docs:    https://nightlies.apache.org/flink/flink-cdc-docs-release-3.1/docs/connectors/flink-sources/mysql-cdc/
+[bootstrap] exists: paimon-flink-1.18-1.4.2.jar
+[bootstrap] downloading paimon-s3-1.4.2.jar
+            from https://repo1.maven.org/maven2/org/apache/paimon/paimon-s3/1.4.2/paimon-s3-1.4.2.jar
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+
+  0      0   0      0   0      0      0      0                              0
+  0 91.90M   0 167.5k   0      0 162.4k      0   09:39   00:01   09:38 162.5k
+  7 91.90M   7  7.04M   0      0  3.30M      0   00:27   00:02   00:25  3.31M
+ 18 91.90M  18 16.63M   0      0  5.08M      0   00:18   00:03   00:15  5.08M
+ 33 91.90M  33 31.02M   0      0  6.97M      0   00:13   00:04   00:09  6.97M
+ 38 91.90M  38 35.70M   0      0  6.20M      0   00:14   00:05   00:09  6.20M
+ 55 91.90M  55 51.20M   0      0  7.21M      0   00:12   00:07   00:05  8.42M
+ 62 91.90M  62 57.70M   0      0  7.12M      0   00:12   00:08   00:04  8.47M
+ 81 91.90M  81 75.31M   0      0  8.15M      0   00:11   00:09   00:02  9.83M
+ 82 91.90M  82 75.41M   0      0  7.33M      0   00:12   00:10   00:02  7.59M
+100 91.90M 100 91.90M   0      0  8.67M      0   00:10   00:10          7.59M
+100 91.90M 100 91.90M   0      0  8.67M      0   00:10   00:10          7.59M
+100 91.90M 100 91.90M   0      0  8.67M      0   00:10   00:10          7.59M
+[bootstrap] exists: flink-shaded-hadoop-2-uber-2.8.3-10.0.jar
+[bootstrap] exists: flink-sql-connector-mysql-cdc-3.1.1.jar
+[bootstrap] exists: mysql-connector-j-8.0.33.jar
+-rw-r--r-- 1 tangy tangy  42M Sep  9 04:51 /home/tangy/work/ChangeLake/flink/lib/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar
+-rw-r--r-- 1 tangy tangy  21M Sep  9 05:07 /home/tangy/work/ChangeLake/flink/lib/flink-sql-connector-mysql-cdc-3.1.1.jar
+-rw-r--r-- 1 tangy tangy 2.4M Sep  9 05:07 /home/tangy/work/ChangeLake/flink/lib/mysql-connector-j-8.0.33.jar
+-rw-r--r-- 1 tangy tangy  53M Sep  9 04:51 /home/tangy/work/ChangeLake/flink/lib/paimon-flink-1.18-1.4.2.jar
+-rw-r--r-- 1 tangy tangy  92M Sep  9 12:15 /home/tangy/work/ChangeLake/flink/lib/paimon-s3-1.4.2.jar
+[bootstrap] jars-only done
+flink/lib/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar
+flink/lib/flink-sql-connector-mysql-cdc-3.1.1.jar
+flink/lib/mysql-connector-j-8.0.33.jar
+flink/lib/paimon-flink-1.18-1.4.2.jar
+flink/lib/paimon-s3-1.4.2.jar
+ Container changelake-mysql Stopping 
+ Container changelake-taskmanager Stopping 
+ Container changelake-taskmanager Stopped 
+ Container changelake-taskmanager Removing 
+ Container changelake-mysql Stopped 
+ Container changelake-mysql Removing 
+ Container changelake-taskmanager Removed 
+ Container changelake-jobmanager Stopping 
+ Container changelake-jobmanager Stopped 
+ Container changelake-jobmanager Removing 
+ Container changelake-mysql Removed 
+ Container changelake-jobmanager Removed 
+ Volume changelake_flink_savepoints Removing 
+ Volume changelake_flink_checkpoints Removing 
+ Volume changelake_mysql_data Removing 
+ Network changelake_net Removing 
+ Volume changelake_flink_savepoints Removed 
+ Volume changelake_mysql_data Removed 
+ Volume changelake_flink_checkpoints Removed 
+ Network changelake_net Removed 
+ Image minio/mc:RELEASE.2025-07-21T05-28-08Z Pulling 
+ Image minio/minio:RELEASE.2025-07-23T15-54-02Z Pulling 
+ 0ed5c6badad0 Pulling fs layer 0B
+ a066377ff156 Pulling fs layer 0B
+ dd15713b0f22 Pulling fs layer 0B
+ 8b059d9a834f Pulling fs layer 0B
+ eef054eaca5d Pulling fs layer 0B
+ 82df1bac4571 Pulling fs layer 0B
+ 1611ffcaf8be Pulling fs layer 0B
+ 02e05d20c69e Pulling fs layer 0B
+ b452b5fb7338 Pulling fs layer 0B
+ e14ab7c7ae26 Pulling fs layer 0B
+ 1f08d9fb7d7d Pulling fs layer 0B
+ adc9ba906e83 Pulling fs layer 0B
+ dd15713b0f22 Pulling fs layer 0B
+ fd312a3c94fc Pulling fs layer 0B
+ 3bf7f4428838 Pulling fs layer 0B
+ dd15713b0f22 Downloading 1.049MB
+ dd15713b0f22 Downloading 1.049MB
+ dd15713b0f22 Downloading 1.049MB
+ dd15713b0f22 Downloading 1.049MB
+ dd15713b0f22 Downloading 2.097MB
+ dd15713b0f22 Downloading 2.097MB
+ dd15713b0f22 Downloading 2.097MB
+ dd15713b0f22 Downloading 2.097MB
+ dd15713b0f22 Downloading 3.146MB
+ dd15713b0f22 Downloading 3.146MB
+ dd15713b0f22 Downloading 4.194MB
+ dd15713b0f22 Downloading 4.194MB
+ dd15713b0f22 Downloading 6.291MB
+ dd15713b0f22 Downloading 6.291MB
+ dd15713b0f22 Download complete 0B
+ dd15713b0f22 Download complete 0B
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 1B
+ 8b059d9a834f Download complete 0B
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 1B
+ 0ed5c6badad0 Downloading 1.049MB
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 1B
+ 0ed5c6badad0 Downloading 1.049MB
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 1B
+ 0ed5c6badad0 Downloading 2.097MB
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 1B
+ 0ed5c6badad0 Downloading 3.146MB
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 1B
+ 0ed5c6badad0 Downloading 4.194MB
+ dd15713b0f22 Extracting 1B
+ 0ed5c6badad0 Downloading 6.291MB
+ eef054eaca5d Download complete 0B
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 1B
+ 0ed5c6badad0 Downloading 8.389MB
+ dd15713b0f22 Extracting 1B
+ dd15713b0f22 Extracting 2B
+ 0ed5c6badad0 Downloading 8.389MB
+ dd15713b0f22 Pull complete 0B
+ dd15713b0f22 Extracting 2B
+ 0ed5c6badad0 Downloading 8.389MB
+ dd15713b0f22 Extracting 2B
+ 0ed5c6badad0 Downloading 9.437MB
+ dd15713b0f22 Extracting 2B
+ 0ed5c6badad0 Download complete 0B
+ a066377ff156 Download complete 0B
+ dd15713b0f22 Extracting 2B
+ dd15713b0f22 Extracting 2B
+ dd15713b0f22 Extracting 2B
+ 82df1bac4571 Downloading 1.049MB
+ dd15713b0f22 Extracting 2B
+ 82df1bac4571 Downloading 1.049MB
+ dd15713b0f22 Extracting 2B
+ 82df1bac4571 Downloading 1.049MB
+ dd15713b0f22 Extracting 2B
+ 82df1bac4571 Downloading 1.049MB
+ dd15713b0f22 Extracting 2B
+ 82df1bac4571 Downloading 1.049MB
+ dd15713b0f22 Extracting 3B
+ 82df1bac4571 Downloading 1.049MB
+ dd15713b0f22 Extracting 3B
+ 82df1bac4571 Downloading 1.049MB
+ dd15713b0f22 Extracting 3B
+ 82df1bac4571 Downloading 10.49MB
+ dd15713b0f22 Extracting 3B
+ 385d8d75cf1d Download complete 0B
+ 82df1bac4571 Download complete 0B
+ dd15713b0f22 Extracting 3B
+ dd15713b0f22 Extracting 3B
+ dd15713b0f22 Extracting 3B
+ dd15713b0f22 Extracting 3B
+ dd15713b0f22 Extracting 3B
+ dd15713b0f22 Extracting 4B
+ dd15713b0f22 Extracting 4B
+ dd15713b0f22 Extracting 4B
+ dd15713b0f22 Extracting 4B
+ dd15713b0f22 Extracting 4B
+ dd15713b0f22 Extracting 4B
+ dd15713b0f22 Extracting 4B
+ 1611ffcaf8be Download complete 0B
+ b452b5fb7338 Downloading 1.049MB
+ dd15713b0f22 Extracting 4B
+ b452b5fb7338 Downloading 1.049MB
+ dd15713b0f22 Extracting 4B
+ b452b5fb7338 Downloading 2.097MB
+ dd15713b0f22 Extracting 4B
+ b452b5fb7338 Downloading 3.146MB
+ dd15713b0f22 Extracting 4B
+ b452b5fb7338 Downloading 4.194MB
+ dd15713b0f22 Extracting 5B
+ b452b5fb7338 Downloading 6.291MB
+ dd15713b0f22 Extracting 5B
+ b452b5fb7338 Downloading 7.34MB
+ dd15713b0f22 Extracting 5B
+ b452b5fb7338 Downloading 7.34MB
+ dd15713b0f22 Extracting 5B
+ b452b5fb7338 Downloading 8.389MB
+ dd15713b0f22 Extracting 5B
+ b452b5fb7338 Downloading 10.49MB
+ dd15713b0f22 Extracting 5B
+ adc9ba906e83 Download complete 0B
+ b452b5fb7338 Download complete 0B
+ 1f08d9fb7d7d Downloading 1.049MB
+ dd15713b0f22 Extracting 5B
+ 1f08d9fb7d7d Downloading 2.097MB
+ dd15713b0f22 Extracting 5B
+ 1f08d9fb7d7d Downloading 2.097MB
+ dd15713b0f22 Extracting 5B
+ 1f08d9fb7d7d Downloading 3.146MB
+ dd15713b0f22 Extracting 6B
+ 1f08d9fb7d7d Downloading 3.146MB
+ dd15713b0f22 Extracting 6B
+ 1f08d9fb7d7d Downloading 4.194MB
+ dd15713b0f22 Extracting 6B
+ 1f08d9fb7d7d Downloading 6.291MB
+ dd15713b0f22 Extracting 6B
+ 1f08d9fb7d7d Downloading 7.34MB
+ dd15713b0f22 Extracting 6B
+ 1f08d9fb7d7d Downloading 9.437MB
+ dd15713b0f22 Extracting 6B
+ 1f08d9fb7d7d Downloading 9.437MB
+ dd15713b0f22 Extracting 6B
+ 1f08d9fb7d7d Downloading 9.437MB
+ dd15713b0f22 Extracting 6B
+ 1f08d9fb7d7d Downloading 9.437MB
+ dd15713b0f22 Extracting 6B
+ 1f08d9fb7d7d Downloading 9.437MB
+ dd15713b0f22 Extracting 6B
+ 1f08d9fb7d7d Downloading 9.437MB
+ dd15713b0f22 Extracting 6B
+ 1f08d9fb7d7d Downloading 9.437MB
+ dd15713b0f22 Extracting 7B
+ 1f08d9fb7d7d Downloading 13.63MB
+ dd15713b0f22 Extracting 7B
+ 1f08d9fb7d7d Downloading 13.63MB
+ dd15713b0f22 Extracting 7B
+ 1f08d9fb7d7d Downloading 13.63MB
+ dd15713b0f22 Extracting 7B
+ 1f08d9fb7d7d Downloading 13.63MB
+ dd15713b0f22 Extracting 7B
+ 1f08d9fb7d7d Downloading 17.83MB
+ dd15713b0f22 Extracting 7B
+ 1f08d9fb7d7d Downloading 17.83MB
+ dd15713b0f22 Extracting 7B
+ e14ab7c7ae26 Downloading 1.049MB
+ 1f08d9fb7d7d Downloading 17.83MB
+ dd15713b0f22 Extracting 7B
+ 1f08d9fb7d7d Downloading 17.83MB
+ e14ab7c7ae26 Downloading 1.049MB
+ dd15713b0f22 Extracting 7B
+ 1f08d9fb7d7d Downloading 17.83MB
+ e14ab7c7ae26 Downloading 1.049MB
+ dd15713b0f22 Extracting 7B
+ 1f08d9fb7d7d Downloading 17.83MB
+ e14ab7c7ae26 Downloading 1.049MB
+ dd15713b0f22 Extracting 8B
+ e14ab7c7ae26 Downloading 1.049MB
+ 1f08d9fb7d7d Downloading 17.83MB
+ dd15713b0f22 Extracting 8B
+ e14ab7c7ae26 Downloading 1.049MB
+ 1f08d9fb7d7d Downloading 17.83MB
+ dd15713b0f22 Extracting 8B
+ e14ab7c7ae26 Downloading 1.049MB
+ 1f08d9fb7d7d Downloading 17.83MB
+ dd15713b0f22 Extracting 8B
+ 1f08d9fb7d7d Downloading 17.83MB
+ e14ab7c7ae26 Downloading 1.049MB
+ dd15713b0f22 Extracting 8B
+ 1f08d9fb7d7d Downloading 17.83MB
+ e14ab7c7ae26 Downloading 1.049MB
+ dd15713b0f22 Extracting 8B
+ e14ab7c7ae26 Downloading 1.049MB
+ 1f08d9fb7d7d Downloading 20.97MB
+ dd15713b0f22 Extracting 8B
+ e14ab7c7ae26 Downloading 1.049MB
+ 1f08d9fb7d7d Downloading 20.97MB
+ 02e05d20c69e Download complete 0B
+ dd15713b0f22 Extracting 8B
+ e14ab7c7ae26 Downloading 2.097MB
+ 1f08d9fb7d7d Downloading 20.97MB
+ dd15713b0f22 Extracting 8B
+ e14ab7c7ae26 Downloading 2.097MB
+ 1f08d9fb7d7d Downloading 20.97MB
+ dd15713b0f22 Extracting 8B
+ 1f08d9fb7d7d Downloading 24.12MB
+ e14ab7c7ae26 Download complete 0B
+ dd15713b0f22 Extracting 9B
+ 1f08d9fb7d7d Downloading 35.65MB
+ dd15713b0f22 Extracting 9B
+ 1f08d9fb7d7d Downloading 35.65MB
+ dd15713b0f22 Extracting 9B
+ 1f08d9fb7d7d Downloading 35.65MB
+ dd15713b0f22 Extracting 9B
+ 1f08d9fb7d7d Downloading 37.75MB
+ dd15713b0f22 Extracting 9B
+ 1f08d9fb7d7d Downloading 38.8MB
+ 3bf7f4428838 Download complete 0B
+ dd15713b0f22 Extracting 9B
+ 1f08d9fb7d7d Download complete 0B
+ dd15713b0f22 Extracting 9B
+ dd15713b0f22 Extracting 9B
+ dd15713b0f22 Extracting 9B
+ dd15713b0f22 Extracting 9B
+ dd15713b0f22 Extracting 10B
+ dd15713b0f22 Extracting 10B
+ 8b059d9a834f Extracting 1B
+ eef054eaca5d Pull complete 0B
+ a066377ff156 Pull complete 0B
+ 8b059d9a834f Pull complete 0B
+ 82df1bac4571 Extracting 1B
+ 0ed5c6badad0 Extracting 1B
+ 82df1bac4571 Pull complete 0B
+ 0ed5c6badad0 Pull complete 0B
+ fd312a3c94fc Downloading 1.049MB
+ fd312a3c94fc Downloading 1.049MB
+ 73f1cee8afd2 Download complete 0B
+ fd312a3c94fc Downloading 1.049MB
+ Image minio/mc:RELEASE.2025-07-21T05-28-08Z Pulled 
+ fd312a3c94fc Downloading 1.049MB
+ fd312a3c94fc Download complete 0B
+ 02e05d20c69e Pull complete 0B
+ 1f08d9fb7d7d Extracting 1B
+ fd312a3c94fc Pull complete 0B
+ 1f08d9fb7d7d Extracting 1B
+ 1f08d9fb7d7d Extracting 1B
+ 1f08d9fb7d7d Pull complete 0B
+ b452b5fb7338 Pull complete 0B
+ 1611ffcaf8be Pull complete 0B
+ adc9ba906e83 Pull complete 0B
+ e14ab7c7ae26 Pull complete 0B
+ 3bf7f4428838 Pull complete 0B
+ Image minio/minio:RELEASE.2025-07-23T15-54-02Z Pulled 
+ Volume changelake_mysql_data Creating 
+ Volume changelake_minio_data Creating 
+ Volume changelake_minio_data Creating 
+ Volume changelake_mysql_data Creating 
+ Volume changelake_flink_savepoints Creating 
+ Volume changelake_flink_savepoints Creating 
+ Volume changelake_flink_checkpoints Creating 
+ Volume changelake_flink_checkpoints Creating 
+ Network changelake_net Creating 
+ Network changelake_net Creating 
+ Volume changelake_mysql_data Created 
+ Volume changelake_mysql_data Created 
+ Volume changelake_minio_data Created 
+ Volume changelake_minio_data Created 
+ Volume changelake_flink_checkpoints Created 
+ Volume changelake_flink_checkpoints Created 
+ Volume changelake_flink_savepoints Created 
+ Volume changelake_flink_savepoints Created 
+ Network changelake_net Created 
+ Network changelake_net Created 
+ Container changelake-mysql Creating 
+ Container changelake-minio Creating 
+ Container changelake-mysql Created 
+ Container changelake-minio Created 
+ Container changelake-minio-init Creating 
+ Container changelake-minio-init Created 
+ Container changelake-jobmanager Creating 
+ Container changelake-jobmanager Created 
+ Container changelake-taskmanager Creating 
+ Container changelake-taskmanager Created 
+ Container changelake-minio Starting 
+ Container changelake-mysql Starting 
+ Container changelake-minio Started 
+ Container changelake-minio Waiting 
+ Container changelake-mysql Started 
+ Container changelake-minio Healthy 
+ Container changelake-minio-init Starting 
+ Container changelake-minio-init Started 
+ Container changelake-minio-init Waiting 
+ Container changelake-minio Waiting 
+ Container changelake-minio-init Exited 
+ Container changelake-minio Healthy 
+ Container changelake-jobmanager Starting 
+ Container changelake-jobmanager Started 
+ Container changelake-minio Waiting 
+ Container changelake-minio-init Waiting 
+ Container changelake-minio Healthy 
+ Container changelake-minio-init Exited 
+ Container changelake-taskmanager Starting 
+ Container changelake-taskmanager Started 
+[wait] MinIO :9000, MySQL :3306, Flink UI :18081 (timeout=180s)
+[wait] MinIO healthy (http://localhost:9000)
+mysqld is alive
+[wait] MySQL healthy
+[wait] Flink UI healthy (http://localhost:18081)
+[wait] all services ready
+=== smoke_storage ===
+[smoke_storage] ensuring jars (incl. paimon-s3-1.4.2.jar)
+[smoke_storage] MinIO live; warehouse=s3://changelake/warehouse endpoint=http://minio:9000
+[smoke_storage] Flink → Paimon CREATE/INSERT/SELECT on MinIO
+ changelake-jobmanager Copying /tmp/tmp.v9FFrU7nVI to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.v9FFrU7nVI to changelake-jobmanager:/tmp/changelake_query.sql
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 4:15:36 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[INFO] Executing SQL from file.
+
+Command history file path: /root/.flink-sql-history
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+> -- Warehouse: MinIO S3 (not local file:///).
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> CREATE TABLE smoke.storage_probe (
+>   id BIGINT,
+>   note STRING,
+>   PRIMARY KEY (id) NOT ENFORCED
+> ) WITH (
+>   'bucket' = '1'
+> )[INFO] Execute statement succeed.
+
+Flink SQL> INSERT INTO smoke.storage_probe VALUES (1, 'minio-ok')[INFO] Submitting SQL update statement to the cluster...
+[INFO] SQL update statement has been successfully submitted to the cluster:
+Job ID: 85ba6e8ed8e3e4fc652388815eb1e25b
+
+
+Flink SQL> Empty set
+
+Flink SQL> 
+Shutting down the session...
+done.
+[smoke_storage] note: mc list empty/unavailable (Flink readback already passed)
+[smoke_storage] PASS Flink → Paimon → MinIO write/read
+SMOKE_EXIT=0
+=== demo_golden_path G1-G4 ===
+[demo] ChangeLake Phase 2 Golden Path G1–G4
+[demo] Flink UI port: 18081 → http://localhost:18081
+[wait] MinIO :9000, MySQL :3306, Flink UI :18081 (timeout=180s)
+[wait] MinIO healthy (http://localhost:9000)
+mysqld is alive
+[wait] MySQL healthy
+[wait] Flink UI healthy (http://localhost:18081)
+[wait] all services ready
+[demo] re-seed MySQL (seed=42) and ensure order 900001 absent
+[seed] applying mysql/002_seed.sql (seed=42)
+mysql: [Warning] Using a password on the command line interface can be insecure.
+[seed] verifying counts
+mysql: [Warning] Using a password on the command line interface can be insecure.
+users	20
+orders	50
+order_items	85
+[seed] expected: users=20 orders=50 order_items=85
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+[pipeline] stopping jobs matching 'changelake-ods-cdc'
+[pipeline] stop requested
+[pipeline] ensuring CDC grants on MySQL user
+mysql: [Warning] Using a password on the command line interface can be insecure.
+[pipeline] ensuring jars present (Paimon + paimon-s3 + CDC + MySQL JDBC)
+[pipeline] canceling previous 'changelake-ods-cdc' jobs (if any)
+[pipeline] ensuring Paimon catalog exists
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 4:15:54 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[INFO] Executing SQL from file.
+
+Command history file path: /root/.flink-sql-history
+Flink SQL> -- ChangeLake: Paimon catalog on MinIO (S3-compatible)
+> -- Docs: https://paimon.apache.org/docs/1.4/maintenance/filesystems/
+> -- Requires: paimon-flink-1.18-1.4.2.jar + paimon-s3-1.4.2.jar
+> --           (+ flink-shaded-hadoop uber) in Flink lib/
+> -- Demo-only keys below; keep in sync with .env.example / scripts/common.sh.
+> 
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> 
+Shutting down the session...
+done.
+[pipeline] submitting Flink SQL: flink/sql/submit_ods_pipeline.sql
+[common] waiting for Flink job '*changelake-ods-cdc*' RUNNING (timeout=180s)
+b6a45c5ece305fcfd8562bd1693d8906
+[common] job RUNNING
+[pipeline] started. Flink UI: http://localhost:18081
+[pipeline] job name: changelake-ods-cdc
+
+==================================================
+[G1] Initial Snapshot
+==================================================
+[wait] ODS counts == MySQL (20/50/85) (timeout=180s)
+ changelake-jobmanager Copying /tmp/tmp.iKHbi3do7w to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.iKHbi3do7w to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.wcPGTiPRHb to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.wcPGTiPRHb to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.6KV2tPbTog to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.6KV2tPbTog to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.9RDtHWpanQ to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.9RDtHWpanQ to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.BY1EeIDemp to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.BY1EeIDemp to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.0PLDaaorun to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.0PLDaaorun to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.pDxv27QYIl to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.pDxv27QYIl to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.TaEasGakmO to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.TaEasGakmO to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.TeS4pWrUFe to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.TeS4pWrUFe to changelake-jobmanager:/tmp/changelake_query.sql
+source.users           = 20
+lake.ods_users         = 20
+source.orders          = 50
+lake.ods_orders        = 50
+source.order_items     = 85
+lake.ods_order_items   = 85
+ changelake-jobmanager Copying /tmp/tmp.dwn1K9TOWj to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.dwn1K9TOWj to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.3QgamHGN7q to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.3QgamHGN7q to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.AUMM8EvSNV to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.AUMM8EvSNV to changelake-jobmanager:/tmp/changelake_query.sql
+[G1] PASS initial snapshot
+
+==================================================
+[G2] Insert
+==================================================
+[mutate] INSERT order_id=900001
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+900001
+[wait] ods_orders contains order_id=900001 (timeout=180s)
+ changelake-jobmanager Copying /tmp/tmp.mk449Fj1b3 to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.mk449Fj1b3 to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.ZOZyTaHhCv to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.ZOZyTaHhCv to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.QBXEjPt10B to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.QBXEjPt10B to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.viJZGyJVuF to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.viJZGyJVuF to changelake-jobmanager:/tmp/changelake_query.sql
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 4:18:04 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[INFO] Executing SQL from file.
+
+Command history file path: /root/.flink-sql-history
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+> -- Warehouse: MinIO S3 (not local file:///).
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> SELECT order_id, user_id, status, CAST(amount AS STRING)+----------+---------+---------+--------+
+| order_id | user_id |  status | amount |
++----------+---------+---------+--------+
+|   900001 |       1 | created |  99.50 |
++----------+---------+---------+--------+
+1 row in set
+
+Flink SQL> 
+Shutting down the session...
+done.
+[G2] PASS insert
+
+==================================================
+[G3] Update
+==================================================
+[mutate] UPDATE order_id=900001 amount=199.99 status=paid
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+900001
+[wait] ods_orders 900001 → amount=199.99 status=paid (single row) (timeout=180s)
+ changelake-jobmanager Copying /tmp/tmp.07rKJPHonm to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.07rKJPHonm to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.VP0F0Csv3o to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.VP0F0Csv3o to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.vFaJSf4kN6 to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.vFaJSf4kN6 to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.kq2xPR4q2K to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.kq2xPR4q2K to changelake-jobmanager:/tmp/changelake_query.sql
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 4:18:36 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[INFO] Executing SQL from file.
+
+Command history file path: /root/.flink-sql-history
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+> -- Warehouse: MinIO S3 (not local file:///).
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> SELECT order_id, user_id, status, CAST(amount AS STRING)+----------+---------+--------+--------+
+| order_id | user_id | status | amount |
++----------+---------+--------+--------+
+|   900001 |       1 |   paid | 199.99 |
++----------+---------+--------+--------+
+1 row in set
+
+Flink SQL> 
+Shutting down the session...
+done.
+[G3] PASS update
+
+==================================================
+[G4] Delete
+==================================================
+[mutate] DELETE order_id=900001
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+[mutate] mysql remaining rows for 900001: 0
+[wait] ods_orders order_id=900001 absent (timeout=180s)
+ changelake-jobmanager Copying /tmp/tmp.Ccn8hdegdv to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.Ccn8hdegdv to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.1inYMejnIY to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.1inYMejnIY to changelake-jobmanager:/tmp/changelake_query.sql
+[G4] PASS delete
+
+==================================================
+ChangeLake Golden Path (Phase 2: G1–G4)
+==================================================
+
+G1  Initial Snapshot       PASS
+G2  Insert                 PASS
+G3  Update                 PASS
+G4  Delete                 PASS
+
+ALL PASS (G1–G4)
+DEMO_EXIT=0
+WRAPPER_DONE

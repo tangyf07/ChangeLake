@@ -19,3 +19,6 @@ flink/lib/*.jar
 # Local warehouse / checkpoints if bind-mounted for debug
 paimon/warehouse/**
 !paimon/warehouse/.gitkeep
+
+# local runtime bind mounts
+data/

@@ -1,4 +1,4 @@
-# Flink 1.18 cluster config for ChangeLake Phase 1
+# Flink 1.18 cluster config for ChangeLake Phase 2
 jobmanager.rpc.address: jobmanager
 jobmanager.rpc.port: 6123
 jobmanager.memory.process.size: 1600m

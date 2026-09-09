@@ -1,0 +1,63 @@
+# ChangeLake Phase 2 evidence
+# Host: WSL Docker on tangyf
+# Branch: phase-2-cdc @ 72e5fb7168f1b5430816c864e8a27c262e9ca4c7
+# Date: 2026-09-09 (Asia/Shanghai)
+# Commands: bash scripts/smoke_storage.sh ; bash scripts/demo_golden_path.sh
+# Result: smoke PASS; G1–G4 ALL PASS; DEMO_EXIT=0
+
+==================================================
+[G3] Update
+==================================================
+[mutate] UPDATE order_id=900001 amount=199.99 status=paid
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+900001
+[wait] ods_orders 900001 → amount=199.99 status=paid (single row) (timeout=180s)
+ changelake-jobmanager Copying /tmp/tmp.07rKJPHonm to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.07rKJPHonm to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.VP0F0Csv3o to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.VP0F0Csv3o to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.vFaJSf4kN6 to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.vFaJSf4kN6 to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.kq2xPR4q2K to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.kq2xPR4q2K to changelake-jobmanager:/tmp/changelake_query.sql
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 4:18:36 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[INFO] Executing SQL from file.
+
+Command history file path: /root/.flink-sql-history
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+> -- Warehouse: MinIO S3 (not local file:///).
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[INFO] Execute statement succeed.
+
+Flink SQL> [INFO] Execute statement succeed.
+
+Flink SQL> SELECT order_id, user_id, status, CAST(amount AS STRING)+----------+---------+--------+--------+
+| order_id | user_id | status | amount |
++----------+---------+--------+--------+
+|   900001 |       1 |   paid | 199.99 |
++----------+---------+--------+--------+
+1 row in set
+
+Flink SQL> 
+Shutting down the session...
+done.
+[G3] PASS update
+
+==================================================

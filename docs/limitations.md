@@ -1,49 +1,82 @@
-# Limitations (Phase 1)
+# Limitations (Phase 2)
 
-ChangeLake Phase 1 只交付本地基础环境，**不**包含完整 CDC 湖仓能力。
+ChangeLake Phase 2 delivers **MySQL → Flink CDC → Paimon ODS** for Golden Path **G1–G4** only.
 
-## 本阶段有什么
+## Architecture Decision (storage)
 
-- Docker Compose：MySQL 8.0.40 + Flink 1.18.1 JobManager/TaskManager
-- 确定性 seed（`seed=42`）：`users=20` / `orders=50` / `order_items=85`
-- Paimon **filesystem catalog stub**（SQL 已就绪，JAR 由 `make jars` 下载）
-- Named volumes：MySQL data、Paimon `/warehouse`、Flink checkpoints/savepoints
-- Flink UI：默认 `http://localhost:8081`；冲突时改 `.env` 的 `FLINK_UI_PORT`（例：`18081`）
-- 不依赖 GNU Make：可用 `bash scripts/bootstrap.sh --jars-only` + `docker compose` + `bash scripts/wait_services.sh`
+Paimon warehouse is **MinIO (S3-compatible)**, not `file:///warehouse`.
 
-## 本阶段没有什么
+- **Why MinIO:** Docker Desktop local FS / VirtioFS caused Paimon `Mkdirs failed` on
+  warehouse paths; host bind mounts + chmod workarounds were brittle.
+- **What stayed local:** Flink checkpoints/savepoints use **named volumes** only
+  (not moved to S3 in this phase).
+- Demo MinIO keys (`minioadmin` / `minioadmin`) are **demo-only**.
 
-- 无 Flink CDC pipeline（无 Initial Snapshot / binlog 作业）
-- 无 Golden Path G1–G10
-- 无 ODS / DWD / ADS 表落地与指标
-- 无 Backfill / Reconcile / Compaction / Time Travel 实验
-- 无 Kafka / Airflow / Kubernetes / MinIO / Prometheus / Grafana / Web UI
-- 无生产级 HA、无 Exactly-Once End-to-End 声明
+## What Phase 2 includes
 
-## 版本与兼容性说明
+- Docker Compose: MySQL 8.0.40 + Flink 1.18.1 JobManager/TaskManager + MinIO
+- Deterministic seed (`seed=42`): `users=20` / `orders=50` / `order_items=85`
+- Flink SQL CDC (`mysql-cdc` **3.1.1**) → Apache Paimon **1.4.2** Primary Key ODS tables on MinIO
+- JAR `paimon-s3-1.4.2.jar` for S3 filesystem access
+- ODS current-state mirror: `ods_users`, `ods_orders`, `ods_order_items`
+- Storage smoke: `scripts/smoke_storage.sh` (Flink → Paimon → MinIO) before G1
+- Automated Golden Path **G1–G4** (`scripts/demo_golden_path.sh`)
+- Mutation helpers for INSERT / UPDATE / DELETE (`order_id=900001`)
+- Flink UI via `FLINK_UI_PORT` (default `8081`; conflict example `18081`)
+- Works without GNU Make (`bash` + `docker compose`)
+
+## What Phase 2 does **not** include
+
+- **G5–G10** (schema evolution, failure recovery, backfill, time travel, reconcile suite, compaction)
+- DWD / ADS business metrics
+- Kafka / HDFS / Hive / Airflow / Kubernetes / Prometheus / Grafana / Web UI / LLM
+- Production HA, multi-region, enterprise catalog/lineage
+- Flink checkpoints on S3 (named volume only; Phase 6+)
+- **Exactly-Once End-to-End** claims beyond documented Flink checkpoint + Paimon PK merge semantics
+
+## Pinned versions & CDC support matrix
 
 | Component | Version | Notes |
 | --- | --- | --- |
-| MySQL | 8.0.40 | ROW binlog + GTID 已开启，供后续 CDC 使用 |
-| Flink | 1.18.1 (`flink:1.18.1-scala_2.12-java17`) | UI port via `FLINK_UI_PORT`（默认 8081） |
+| MySQL | 8.0.40 | ROW binlog + GTID; CDC user needs `REPLICATION SLAVE/CLIENT` |
+| Flink | 1.18.1 (`flink:1.18.1-scala_2.12-java17`) | UI port via `FLINK_UI_PORT` |
 | Paimon | 1.4.2 | JAR: `paimon-flink-1.18-1.4.2.jar` |
-| Hadoop uber | `flink-shaded-hadoop-2-uber-2.8.3-10.0` | filesystem warehouse 所需 |
+| Paimon S3 | 1.4.2 | JAR: `paimon-s3-1.4.2.jar` (`org.apache.paimon:paimon-s3:1.4.2`) |
+| Hadoop uber | `flink-shaded-hadoop-2-uber-2.8.3-10.0` | classpath support for FS plugins |
+| MinIO | `minio/minio:RELEASE.2025-07-23T15-54-02Z` | warehouse + bucket `changelake` |
+| Flink CDC | **3.1.1** | JAR: `flink-sql-connector-mysql-cdc-3.1.1.jar` |
+| MySQL JDBC | 8.0.33 | JAR: `mysql-connector-j-8.0.33.jar` (not bundled in CDC SQL connector) |
 
-兼容性来源：[Apache Paimon 1.4 Flink Quick Start](https://paimon.apache.org/docs/1.4/flink/quick-start/)  
-（Paimon 1.4.2 提供 `paimon-flink-1.18-*.jar`，支持 Flink 1.16–1.20 / 2.x。）
+CDC docs: [Flink CDC 3.1 MySQL source](https://nightlies.apache.org/flink/flink-cdc-docs-release-3.1/docs/connectors/flink-sources/mysql-cdc/)  
+Paimon docs: [Paimon 1.4 Flink Quick Start](https://paimon.apache.org/docs/1.4/flink/quick-start/)  
+Paimon S3/MinIO: [Filesystems](https://paimon.apache.org/docs/1.4/maintenance/filesystems/)
 
-## 语义边界（勿夸大）
+### Verified in this phase (by design / script)
 
-- Phase 1 **不**验证 checkpoint 恢复后的数据正确性。
-- Phase 1 **不**声称 Exactly-Once、生产 HA、零数据丢失。
-- Demo 凭据仅用于本地（见 `.env.example`）。
-- Paimon 写入能力取决于本机是否已执行 `make jars`；本仓库 Phase 1 CI/环境未必实际跑通 Flink→Paimon 写入。
+| Capability | Status |
+| --- | --- |
+| MinIO healthy + bucket | compose health + `minio-init` / `scripts/minio_init.sh` |
+| Flink → Paimon → MinIO write/read | `smoke_storage` (scripted) |
+| Initial Snapshot → ODS counts | G1 (scripted) |
+| INSERT propagation | G2 (scripted) |
+| UPDATE → single current-state row | G3 (scripted) |
+| DELETE → row absent in current-state query | G4 (scripted) |
+| ADD COLUMN / schema evolution | **Not in Phase 2** |
+| TM kill + recovery | **Not in Phase 2** |
 
-## Schema 边界
+Local Docker E2E must be run on a machine with Docker; CI / authoring agents do not claim full CDC E2E.
 
-- `orders` **尚未**包含 `channel` / `coupon_amount`（留给后续 Schema Evolution 阶段）。
+## Semantics boundaries (do not over-claim)
 
-## 运行环境备注
+- ODS tables are **current-state mirrors** (Paimon PK + `deduplicate`), not append-only CDC logs.
+- Recovery correctness after TaskManager failure is **not** proven in Phase 2.
+- Demo credentials only (see `.env.example`), including MinIO `minioadmin`/`minioadmin`.
+- Dataset is synthetic and laptop-scale.
+- `start_pipeline.sh` drops/recreates ODS tables on each start (demo-friendly; not a production migration tool).
 
-- 精简 WSL 可能没有 `make`：请用 bash 脚本与 `docker compose`，不要把 `make` 当成硬依赖。
-- 若 `Bind for 0.0.0.0:8081 failed: port is already allocated`：在 `.env` 设置 `FLINK_UI_PORT=18081`（或其它空闲端口）后 `docker compose up -d`。
+## Runtime notes
+
+- If `Bind for 0.0.0.0:8081 failed`: set `FLINK_UI_PORT=18081` (or free port) in `.env`, then `docker compose up -d`.
+- After downloading new jars (especially `paimon-s3`), restart JM/TM so `/jars` is copied into `/opt/flink/lib` (`start_pipeline.sh` / `smoke_storage.sh` do this when missing).
+- Recommended order: **MinIO healthy + bucket → `smoke_storage` PASS → Golden Path G1→G2→G4**.
+- No `make`? Use the bash equivalents in README Quickstart.
