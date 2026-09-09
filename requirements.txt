@@ -1,3 +1,4 @@
-# ChangeLake Phase 1 — minimal Python deps for seed generation / later tests
-# Python 3.11+
-# No runtime DB driver required for Phase 1 seed SQL (committed under mysql/).
+# ChangeLake Phase 10 — Python deps
+# Runtime: stdlib only for seed / fingerprint / reconcile helpers.
+# Dev / CI:
+pytest>=8.0
