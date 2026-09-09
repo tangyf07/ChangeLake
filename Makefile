@@ -1,4 +1,4 @@
-# ChangeLake Phase 6 (Backfill / G7) — MinIO warehouse; G1–G6 + P5 + G7
+# ChangeLake Phase 7 (Time Travel / G8) — MinIO warehouse; G1–G6 + P5 + G7 + G8
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
@@ -7,10 +7,10 @@ ENV_FILE := .env
 
 .PHONY: help up down reset seed jars bootstrap wait status ps logs mysql-cli flink-sql \
 	pipeline stop-pipeline demo mutate-insert mutate-update mutate-delete schema-evolution \
-	failure-recovery minio-init smoke-storage start-dwd-ads dwd-ads backfill
+	failure-recovery minio-init smoke-storage start-dwd-ads dwd-ads backfill time-travel
 
 help:
-	@echo "ChangeLake Phase 6 targets:"
+	@echo "ChangeLake Phase 7 targets:"
 	@echo "  make jars            Download Paimon + paimon-s3 + Hadoop + Flink CDC + MySQL JDBC"
 	@echo "  make up              cp .env.example .env (if missing) && compose up -d"
 	@echo "  make wait            Wait until MinIO + MySQL + Flink UI are healthy"
@@ -23,11 +23,12 @@ help:
 	@echo "  make failure-recovery  G6 TM kill + checkpoint restore (pipeline must be RUNNING)"
 	@echo "  make start-dwd-ads   Submit DWD streaming + ADS batch refresh"
 	@echo "  make dwd-ads         Verify DWD + ADS metrics (scripts/verify_dwd_ads.sh)"
-	@echo "  make demo            Golden Path G1–G6 + P5 + G7 backfill"
+	@echo "  make demo            Golden Path G1–G6 + P5 + G7 + G8 time travel"
 	@echo "  make backfill DT=... Date-scoped DWD/ADS repair (G7); requires DT=YYYY-MM-DD"
+	@echo "  make time-travel     G8 Paimon snapshot time travel (ods.ods_tt_demo)"
 	@echo "  make down / reset / status / mysql-cli / bootstrap"
 	@echo "  Note: FLINK_UI_PORT from .env (default 8081; use 18081 if busy)"
-	@echo "  Order: jars → up → wait → smoke-storage → demo  (or dwd-ads / backfill after P5)"
+	@echo "  Order: jars → up → wait → smoke-storage → demo  (or dwd-ads / backfill / time-travel)"
 
 jars:
 	bash scripts/bootstrap.sh --jars-only
@@ -110,3 +111,6 @@ dwd-ads:
 backfill:
 	@if [[ -z "$(DT)" ]]; then echo "Usage: make backfill DT=YYYY-MM-DD" >&2; exit 2; fi
 	bash scripts/backfill.sh "$(DT)"
+
+time-travel:
+	bash scripts/time_travel.sh

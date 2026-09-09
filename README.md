@@ -2,15 +2,15 @@
 
 可复现的 CDC 增量湖仓演示：**MySQL → Flink CDC → Apache Paimon (MinIO)**。
 
-> **当前仓库状态：Phase 6（Backfill / G7）**  
+> **当前仓库状态：Phase 7（Snapshot / Time Travel / G8）**  
 > Flink SQL `mysql-cdc` → Paimon ODS → **DWD** `dwd_orders` → **ADS** `ads_order_daily`（MinIO S3）。  
-> Golden Path **G1–G6 + P5 + G7**（含日期范围幂等 Backfill）。  
-> **尚未**实现 G8–G10、Time Travel、全量 Reconcile、Compaction。  
-> **不声称** EO-2PC / Exactly-Once E2E / 连续流式 ADS / 通用 Backfill 编排器。
+> Golden Path **G1–G6 + P5 + G7 + G8**（含日期范围幂等 Backfill + Paimon snapshot time travel）。  
+> **尚未**实现 G9–G10、全量 Reconcile、Compaction。  
+> **不声称** EO-2PC / Exactly-Once E2E / 连续流式 ADS / 通用 Backfill 编排器 / 生产级快照保留 SLA。
 
 ## Why
 
-业务库里的可变关系数据，如何通过 CDC 进入现代湖仓，并在 UPDATE / DELETE / **DDL** / **TM 故障**后仍保持当前状态正确，再冻结 DWD 语义并产出 ADS 日指标，最后对历史错误日做 **分区级 Backfill**——Phase 6 在 G1–G6 + P5 基础上加入 G7（MySQL 快照修复 DWD/ADS；幂等 fingerprint；不声称 EO-2PC）。
+业务库里的可变关系数据，如何通过 CDC 进入现代湖仓，并在 UPDATE / DELETE / **DDL** / **TM 故障**后仍保持当前状态正确，再冻结 DWD 语义并产出 ADS 日指标，对历史错误日做 **分区级 Backfill**，最后用 Paimon **Snapshot Time Travel** 回看 INSERT→UPDATE→DELETE——Phase 7 在 G1–G6 + P5 + G7 基础上加入 G8（专用表 `ods.ods_tt_demo`；`scan.snapshot-id`；不声称 EO-2PC）。
 
 ## Architecture Decision (storage)
 
@@ -20,7 +20,7 @@
 
 **原因：** Docker Desktop 本地 FS / VirtioFS 上 Paimon `Mkdirs failed`；对象存储避开该类本地 mkdir 问题。Flink checkpoint 仍用 named volume（G6 依赖 `/checkpoints` 在 TM kill 后仍可读）。
 
-## Architecture (Phase 6)
+## Architecture (Phase 7)
 
 ```text
 MySQL 8.0.40 (ROW binlog + GTID)
@@ -37,6 +37,7 @@ Paimon 1.4.2 PK tables  (paimon-s3-1.4.2.jar)
   dwd.dwd_orders  (Phase 5; net_amount = amount while coupon absent)
   ads.ads_order_daily  (Phase 5; dt + channel; NULL channel → 'unknown')
   G7 backfill: MySQL(dt) → replace DWD/ADS for that dt (bypass CDC)
+  G8 time travel: ods.ods_tt_demo snapshots (S1/S2/S3) via scan.snapshot-id
 ```
 
 Named volumes: `changelake_mysql_data`, `changelake_minio_data`,
@@ -62,10 +63,11 @@ Named volumes: `changelake_mysql_data`, `changelake_minio_data`,
 - Failure recovery: [`docs/failure-recovery.md`](docs/failure-recovery.md)
 - DWD/ADS: [`docs/dwd-ads.md`](docs/dwd-ads.md)
 - Backfill / G7: [`docs/backfill.md`](docs/backfill.md)
+- Time Travel / G8: [`docs/time-travel.md`](docs/time-travel.md)
 
 ## Quickstart
 
-推荐运行顺序：**up → MinIO healthy/bucket → smoke_storage → demo_golden_path (G1→G6→P5→G7)**。
+推荐运行顺序：**up → MinIO healthy/bucket → smoke_storage → demo_golden_path (G1→G6→P5→G7→G8)**。
 
 ```bash
 cp .env.example .env          # demo credentials only (incl. MinIO minioadmin/minioadmin)
@@ -75,7 +77,7 @@ bash scripts/bootstrap.sh --jars-only
 docker compose up -d
 bash scripts/wait_services.sh
 bash scripts/smoke_storage.sh          # Flink → Paimon → MinIO MUST PASS
-bash scripts/demo_golden_path.sh       # G1→G6→P5→G7
+bash scripts/demo_golden_path.sh       # G1→G6→P5→G7→G8
 ```
 
 有 GNU Make 时：
@@ -145,6 +147,19 @@ bash scripts/verify_backfill.sh
 
 期望：`[G7] PASS backfill`；证据 `docs/evidence/g7_backfill.txt`。详见 [`docs/backfill.md`](docs/backfill.md)。
 
+### Time Travel / G8 (Phase 7)
+
+专用表 **`ods.ods_tt_demo`**（不改 `ods_orders` / 金线计数）：S1 INSERT amount=100 → S2 UPDATE amount=200 → S3 DELETE；
+记录 `snapshot_id` + `commit_time`；用 `/*+ OPTIONS('scan.snapshot-id'='N') */` 回看历史。
+
+```bash
+bash scripts/time_travel.sh
+# 或: make time-travel
+# 别名: bash scripts/verify_time_travel.sh
+```
+
+期望：`[G8] PASS time travel`；证据 `docs/evidence/g8_time_travel.txt`。详见 [`docs/time-travel.md`](docs/time-travel.md)。
+
 ### Storage smoke
 
 ```bash
@@ -154,7 +169,7 @@ bash scripts/smoke_storage.sh
 
 期望：`[smoke_storage] PASS Flink → Paimon → MinIO write/read`（断言 **SELECT 结果行**含 `minio-ok`）。
 
-### Golden Path G1–G6 + P5 + G7
+### Golden Path G1–G6 + P5 + G7 + G8
 
 ```bash
 bash scripts/demo_golden_path.sh
@@ -172,7 +187,8 @@ bash scripts/demo_golden_path.sh
 [G6] PASS failure recovery
 [DWD/ADS] PASS
 [G7] PASS backfill
-ALL PASS (G1–G6 + P5 + G7)
+[G8] PASS time travel
+ALL PASS (G1–G6 + P5 + G7 + G8)
 ```
 
 任一失败：`exit 2`（不会仅 WARNING 后继续）。
@@ -187,8 +203,9 @@ ALL PASS (G1–G6 + P5 + G7)
 | G6 | ≥1 checkpoint → kill TM → restore → Paimon == MySQL（`order_id=3,900003`） |
 | P5 | DWD `net_amount` + ADS 日指标 vs MySQL（默认 `CHECK_DT=2026-08-02`） |
 | G7 | 腐蚀 DWD → `backfill` ×2 → fingerprint 相等 + reconcile（默认 `BACKFILL_DT=2026-08-13`） |
+| G8 | `ods.ods_tt_demo`：S1 amount=100 → S2 amount=200 → S3 DELETE；按 snapshot-id 回看 |
 
-Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`、`dwd_ads.txt`、`g7_backfill.txt`（由 demo / verify 写入；未跑 Docker 时为 NOT RUN stub）。
+Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`、`dwd_ads.txt`、`g7_backfill.txt`、`g8_time_travel.txt`（由 demo / verify 写入；未跑 Docker 时为 NOT RUN stub）。
 
 ### Schema evolution support matrix (honest)
 
@@ -212,7 +229,7 @@ Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`、`dwd_ads.txt`、`g7_backfil
 
 金额均为 `DECIMAL(12,2)`。重新灌数：`make seed` / `bash scripts/seed.sh`。
 
-## Guarantees (Phase 5)
+## Guarantees (Phase 7)
 
 ```text
 MinIO warehouse for Paimon (scripted smoke)
@@ -222,10 +239,12 @@ INSERT / UPDATE / DELETE propagation (G2–G4)
 Schema evolution within documented support matrix (G5 explicit migration)
 TaskManager kill + checkpoint restore → ODS == MySQL (scripted G6)
 DWD order semantic freeze + ADS daily metrics vs MySQL (scripted P5)
-Automated Golden Path G1–G6 + P5
+Date-scoped backfill + idempotent fingerprint (scripted G7)
+Paimon snapshot time travel on dedicated demo table (scripted G8)
+Automated Golden Path G1–G6 + P5 + G7 + G8
 ```
 
-**Not claimed:** Exactly-Once E2E / **EO-2PC**、连续流式 ADS、透明 SQL-CDC DDL、G8–G10、通用 Backfill 编排器、`coupon_amount` CDC、生产 HA/SLA、checkpoint-on-S3、Pipeline YAML auto schema sync。
+**Not claimed:** Exactly-Once E2E / **EO-2PC**、连续流式 ADS、透明 SQL-CDC DDL、G9–G10、通用 Backfill 编排器、`coupon_amount` CDC、生产 HA/SLA / 快照保留 SLA、checkpoint-on-S3、Pipeline YAML auto schema sync、连续 CDC 作业上的 time travel。
 
 ## Credentials
 
@@ -233,7 +252,7 @@ Automated Golden Path G1–G6 + P5
 
 ## Limitations
 
-详见 [`docs/limitations.md`](docs/limitations.md)。语义：[`docs/semantics.md`](docs/semantics.md)。架构：[`docs/architecture.md`](docs/architecture.md)。Schema Evolution：[`docs/schema-evolution.md`](docs/schema-evolution.md)。Failure Recovery：[`docs/failure-recovery.md`](docs/failure-recovery.md)。DWD/ADS：[`docs/dwd-ads.md`](docs/dwd-ads.md)。
+详见 [`docs/limitations.md`](docs/limitations.md)。语义：[`docs/semantics.md`](docs/semantics.md)。架构：[`docs/architecture.md`](docs/architecture.md)。Schema Evolution：[`docs/schema-evolution.md`](docs/schema-evolution.md)。Failure Recovery：[`docs/failure-recovery.md`](docs/failure-recovery.md)。DWD/ADS：[`docs/dwd-ads.md`](docs/dwd-ads.md)。Backfill：[`docs/backfill.md`](docs/backfill.md)。Time Travel：[`docs/time-travel.md`](docs/time-travel.md)。
 
 ## Layout
 
@@ -246,11 +265,11 @@ flink/sql/paimon_catalog.sql  cdc_source.sql  ods.sql  dwd.sql  ads.sql
 flink/sql/submit_ods_pipeline.sql  submit_ods_pipeline_evolved.sql
 flink/sql/submit_dwd_pipeline.sql  submit_ads_pipeline.sql
 scripts/schema_evolution.sh  failure_recovery.sh  start_dwd_ads.sh  verify_dwd_ads.sh
-scripts/demo_golden_path.sh  …
-docs/schema-evolution.md  failure-recovery.md  dwd-ads.md  limitations.md  golden-path.md
-docs/evidence/g1..g6_*.txt  dwd_ads.txt
+scripts/demo_golden_path.sh  time_travel.sh  verify_time_travel.sh  …
+docs/schema-evolution.md  failure-recovery.md  dwd-ads.md  backfill.md  time-travel.md
+docs/evidence/g1..g8_*.txt  dwd_ads.txt
 ```
 
 ## Next phases (not in this commit)
 
-Phase 7+: Time Travel、全量 Reconcile、Compaction（G8–G10）。
+Phase 8+: 全量 Reconcile、Compaction（G9–G10）。

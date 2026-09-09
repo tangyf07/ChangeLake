@@ -1,0 +1,14 @@
+Phase 7 local verify (WSL Docker) @ 2026-09-09 Asia/Shanghai
+SHA under test: 5ceeade969226d87755dbfd2c9b91cc6f3cf1756 (phase-7-timetravel)
+FLINK_UI_PORT=18081; slots=10
+
+Results:
+- demo_golden_path G1–G6 + P5 + G7 + G8: ALL PASS (DEMO_EXIT=0)
+- G8 ods.ods_tt_demo order_id=100:
+  S1 snapshot_id=1 amount=100.00
+  S2 snapshot_id=2 amount=200.00
+  S3 snapshot_id=3 row absent (current + historical)
+- Travel via /*+ OPTIONS('scan.snapshot-id'='N') */
+
+Evidence: docs/evidence/g8_time_travel.txt (this commit)
+NOT claimed: EO-2PC; continuous CDC time travel on live ODS; G9–G10
