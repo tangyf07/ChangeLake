@@ -1,4 +1,4 @@
-# Semantics (Phase 4 scope: G1–G6)
+# Semantics (Phase 10 — G1–G10)
 
 ## CDC
 
@@ -17,68 +17,46 @@ Paimon Primary Key ODS (merge-engine = deduplicate)
 ## Current state vs history
 
 - **Current-state query** on `ods_*`: latest logical row per PK; DELETE → row absent.
-- Historical snapshot / time travel is **out of scope** for Phase 2 (see G8 later).
+- **G8 Time Travel**: dedicated `ods.ods_tt_demo` + `scan.snapshot-id` (not continuous CDC job TT).
 
-## UPDATE
+## UPDATE / DELETE
 
-Paimon PK table keeps a single logical row for `order_id`. After UPDATE, G3 asserts `COUNT(*)=1` with `amount=199.99` and `status=paid`.
-
-## DELETE
-
-Source `DELETE` is applied as a retract on the PK table. G4 asserts current-state `COUNT(*)=0` for `order_id=900001`.
+- UPDATE keeps a single logical PK row (G3).
+- DELETE retracts the PK row from current state (G4).
 
 ## Money
 
-All money columns are `DECIMAL(12,2)` end-to-end (MySQL, Flink, Paimon). No `FLOAT` / `DOUBLE` for amounts.
-
-## Duplicates / recovery (honest)
-
-Flink checkpointing is enabled (`execution.checkpointing.interval=10s`, dir `file:///checkpoints`).
-Phase 4 **G6** runs a TaskManager kill + restore experiment and asserts Paimon current-state
-matches MySQL after catch-up. That proves **practical recovery**, **not** EO-2PC / Exactly-Once E2E.
-Paimon PK upsert is idempotent w.r.t. duplicate same-key values, which helps after at-least-once replay.
-
+All money columns are `DECIMAL(12,2)` (or ADS `DECIMAL(18,2)` aggregates) end-to-end.
+No `FLOAT` / `DOUBLE` for amounts. G9 reconcile uses `decimal.Decimal` only (tol 0.01).
 
 ## Schema Evolution (G5)
 
-ChangeLake Phase 3 supports **ADD COLUMN** on `orders` → `channel VARCHAR(32)` via an
-**explicit migration**, not transparent Flink SQL CDC DDL sync.
-
-```text
-MySQL ALTER ADD COLUMN (pipeline may stay RUNNING)
-        ↓
-Paimon ALTER TABLE ods.ods_orders ADD channel STRING
-        ↓
-Resubmit Flink SQL with evolved mysql_orders + SELECT channel
-        ↓
-ODS shows channel; old rows NULL; new DML syncs values
-```
-
-### Support matrix (honest)
-
-| DDL | Status |
-| --- | --- |
-| ADD COLUMN (nullable) | **Tested** via G5 explicit migration |
-| DROP COLUMN | Not tested / not claimed |
-| RENAME COLUMN | Not tested / not claimed |
-| ALTER COLUMN TYPE | Not tested / not claimed |
-
-Flink SQL `mysql-cdc` 3.1.1 table schemas are fixed at submit time. Pipeline YAML schema
-evolution is out of MVP scope. Details: [`schema-evolution.md`](schema-evolution.md).
-
+**ADD COLUMN** `orders.channel` via **explicit migration** (MySQL ALTER → Paimon ALTER → resubmit).
+Not transparent Flink SQL CDC DDL. DROP/RENAME/type-change: not claimed.
 
 ## Failure Recovery (G6)
 
-```text
-≥1 completed checkpoint (Flink REST)
-        ↓
-MySQL UPDATE/INSERT (order_id=3, 900003)
-        ↓
-docker kill TaskManager → compose up taskmanager
-        ↓
-Job RUNNING (fixed-delay restart from checkpoint)
-        ↓
-More UPDATEs → ODS == MySQL
-```
+TM kill + checkpoint restore → practical catch-up. **Not** EO-2PC / Exactly-Once E2E.
 
-Details: [`failure-recovery.md`](failure-recovery.md).
+## DWD / ADS (P5)
+
+- DWD `dwd.dwd_orders`: order grain; `coupon_amount` NULL; `net_amount = amount`.
+- ADS `ads.ads_order_daily`: batch `INSERT OVERWRITE` by `(dt, channel)`; NULL channel → `'unknown'`.
+- Paid statuses: `paid` / `shipped` / `completed` (see `docs/dwd-ads.md`).
+
+## Backfill (G7)
+
+Date-scoped DWD/ADS repair; content fingerprint idempotent on re-run. Demo partition logic — not a general orchestrator.
+
+## Reconcile (G9)
+
+MySQL ↔ ODS current-state counts + `SUM(amount)` (total / dt / dt+channel). Demo check — not continuous monitoring.
+
+## Compaction (G10)
+
+Dedicated `ods.ods_compact_demo` (`write-only`); datagen writes; `CALL sys.compact(..., 'full')`.
+Hard gate: query fingerprint identical. Soft: file count reduced. Not production sizing/latency SLA.
+
+## Duplicates / recovery (honest)
+
+Checkpointing enabled. Paimon PK upsert helps after at-least-once replay. Do not claim Exactly-Once E2E.
