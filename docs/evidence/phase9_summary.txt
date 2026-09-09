@@ -1,22 +1,15 @@
 Phase 9 / G10 Compaction — PASS (local WSL Docker, 2026-09-09)
 
 PR: https://github.com/tangyf07/ChangeLake/pull/8
-Tip: 0068683dd2db301480e98dfb04377bd06ab66f95 (phase-9-compaction)
-Base main at open: cee8705b0b3edf87a93a36717bbf642d63046507 (Phase 8)
-
+Merged main: 42114a79c57dad2c43bd2a1a5029d2197ec5c714
 Gate evidence: docs/evidence/g10_compaction.txt (PASS)
 
-What ran:
-- Dedicated table ods.ods_compact_demo (does not mutate ods_orders / G1–G9 counts)
-- write-only=true; write path = Flink datagen → INSERT SELECT (30×100 = 3000 rows)
-  (multi-row VALUES rejected: expands to Values→Calc[N] and exhausts TM network buffers)
-- CALL sys.compact('ods.ods_compact_demo', '', '', '', 'sink.parallelism=1', '', '', 'full')
-- Hard: fingerprint_before == fingerprint_after = 07d78e13c46d8379956f9659a9d9969c689d79ea338b0761eaf4a8725127b4fc
-- Soft: file_count 30 → 1; total_file_size_bytes 67156 → 16345
-- Latency recorded only (8245 → 8022 ms; not a hard gate)
+Result:
+- ALL PASS for G10 gate (standalone make compaction)
+- DEMO_EXIT=0 for G10 evidence path (g10_compaction.txt ends with PASS)
+- file_count 30 → 1; fingerprint match 07d78e13…5127b4fc
+- write: datagen→INSERT SELECT 30×100=3000; CALL sys.compact full
 
-Stack: Flink 1.18.1 / Paimon 1.4.2 / MinIO s3://changelake/warehouse / FLINK_UI_PORT=18081
+NOT claimed: production sizing SLA / EO-2PC / latency % / continuous CDC compaction
 
-NOT claimed: production sizing SLA / EO-2PC / Exactly-Once E2E / latency % drop / continuous CDC compaction
-
-Acceptance: 项目验收 stamp 2026-09-09 — 通过; merge PR #8 → main authorized.
+Acceptance: 项目验收 2026-09-09 — 通过
