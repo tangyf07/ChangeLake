@@ -1,0 +1,17 @@
+Phase 7 (Snapshot / Time Travel / G8) — authored via GitHub API
+Base: e93e2564b86ec9e2ed564e1e5ea991045cfab975 (main / Phase 6 merge)
+Branch: phase-7-timetravel
+
+Delivered:
+- scripts/time_travel.sh (+ verify_time_travel.sh alias)
+- G8 wired after G7 in scripts/demo_golden_path.sh
+- docs/time-travel.md + docs/evidence/g8_time_travel.txt (NOT RUN stub until local Docker)
+- Makefile target: time-travel
+- README / golden-path / limitations updated for Phase 7
+
+Local verify (when Docker available):
+  make jars && make up && make wait && make smoke-storage
+  make time-travel
+  # or: make demo   # G1–G6 + P5 + G7 + G8
+
+NOT claimed: EO-2PC; G9–G10; continuous CDC time travel; production snapshot retention SLA

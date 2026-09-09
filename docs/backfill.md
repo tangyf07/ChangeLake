@@ -80,7 +80,7 @@ Idempotency proof in G7: `fingerprint(run1) == fingerprint(run2)`.
 - **EO-2PC** / Exactly-Once end-to-end
 - A general production backfill **orchestrator** (Airflow/etc.) — this is **demo** partition-scoped logic
 - Re-running full CDC / ODS rebuild as part of backfill
-- **G8–G10** (time travel, full reconcile suite, compaction) / Phase 7+
+- **G9–G10** (time travel, full reconcile suite, compaction) / Phase 7+
 - Continuous streaming ADS; physical Hive-style partitions on `dt`
 
 ## Relation to Phase 5
