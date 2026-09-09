@@ -2,14 +2,14 @@
 
 可复现的 CDC 增量湖仓演示：**MySQL → Flink CDC → Apache Paimon (MinIO)**。
 
-> **当前仓库状态：Phase 9（Compaction / G10）**  
+> **当前仓库状态：Phase 10（工程化收尾 / §27）**  
 > Flink SQL `mysql-cdc` → Paimon ODS → **DWD** `dwd_orders` → **ADS** `ads_order_daily`（MinIO S3）。  
 > Golden Path **G1–G6 + P5 + G7 + G8 + G9 + G10**（含日期范围幂等 Backfill + Paimon snapshot time travel + source↔lake reconcile + **demo compaction**）。  
 > **不声称** EO-2PC / Exactly-Once E2E / 连续监控式 Reconcile / 连续流式 ADS / 通用 Backfill 编排器 / 生产级快照保留 SLA / **生产级 Compaction 容量或延迟 SLA**。
 
 ## Why
 
-业务库里的可变关系数据，如何通过 CDC 进入现代湖仓，并在 UPDATE / DELETE / **DDL** / **TM 故障**后仍保持当前状态正确，再冻结 DWD 语义并产出 ADS 日指标，对历史错误日做 **分区级 Backfill**，用 Paimon **Snapshot Time Travel** 回看 INSERT→UPDATE→DELETE，用 **G9 Reconcile** 核对 MySQL↔ODS，最后在专用表上做 **G10 Compaction**（小文件合并后查询指纹不变）——Phase 9 在 G1–G6 + P5 + G7 + G8 + G9 基础上加入 G10（演示级 compaction；硬门禁是数据指纹一致，文件数下降为软期望；非生产容量/延迟 SLA / 非 EO-2PC）。
+业务库里的可变关系数据，如何通过 CDC 进入现代湖仓，并在 UPDATE / DELETE / **DDL** / **TM 故障**后仍保持当前状态正确，再冻结 DWD 语义并产出 ADS 日指标，对历史错误日做 **分区级 Backfill**，用 Paimon **Snapshot Time Travel** 回看 INSERT→UPDATE→DELETE，用 **G9 Reconcile** 核对 MySQL↔ODS，最后在专用表上做 **G10 Compaction**（小文件合并后查询指纹不变）——Phase 10 在 G1–G10 已合入基础上补齐 pytest / 轻 CI / Makefile / docs / evidence；停工条件见说明 §27。
 
 ## Architecture Decision (storage)
 
@@ -19,7 +19,7 @@
 
 **原因：** Docker Desktop 本地 FS / VirtioFS 上 Paimon `Mkdirs failed`；对象存储避开该类本地 mkdir 问题。Flink checkpoint 仍用 named volume（G6 依赖 `/checkpoints` 在 TM kill 后仍可读）。
 
-## Architecture (Phase 9)
+## Architecture (Phase 10)
 
 ```text
 MySQL 8.0.40 (ROW binlog + GTID)
@@ -263,7 +263,7 @@ Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`、`dwd_ads.txt`、`g7_backfil
 
 金额均为 `DECIMAL(12,2)`。重新灌数：`make seed` / `bash scripts/seed.sh`。
 
-## Guarantees (Phase 9)
+## Guarantees (Phase 10)
 
 ```text
 MinIO warehouse for Paimon (scripted smoke)
@@ -281,6 +281,25 @@ Automated Golden Path G1–G6 + P5 + G7 + G8 + G9 + G10
 ```
 
 **Not claimed:** Exactly-Once E2E / **EO-2PC**、连续监控式 Reconcile、连续流式 ADS、透明 SQL-CDC DDL、**生产级 Compaction 容量/延迟 SLA**、通用 Backfill 编排器、`coupon_amount` CDC、生产 HA/SLA / 快照保留 SLA、checkpoint-on-S3、Pipeline YAML auto schema sync、连续 CDC 作业上的 time travel / compaction。
+
+## CI vs local E2E
+
+GitHub Actions (`ci.yml`) runs:
+
+```text
+python compileall
+bash -n scripts/*.sh
+pytest
+```
+
+**Full Golden Path is local Docker E2E** (`make demo` → G1–G10, prints `ALL PASS` + `DEMO_EXIT=0`).
+CI does **not** pretend to cover Flink CDC + Paimon end-to-end.
+
+```bash
+make lint
+make test   # or: make ci
+make demo   # local Docker; requires jars + compose stack
+```
 
 ## Credentials
 
@@ -302,12 +321,17 @@ flink/sql/submit_ods_pipeline.sql  submit_ods_pipeline_evolved.sql
 flink/sql/submit_dwd_pipeline.sql  submit_ads_pipeline.sql
 scripts/schema_evolution.sh  failure_recovery.sh  start_dwd_ads.sh  verify_dwd_ads.sh
 scripts/demo_golden_path.sh  time_travel.sh  verify_time_travel.sh  reconcile.sh  compaction.sh  …
-python/reconcile_report.py
+python/fingerprint.py  reconcile_report.py
+tests/                    # pytest (CI)
+.github/workflows/ci.yml
 docs/schema-evolution.md  failure-recovery.md  dwd-ads.md  backfill.md  time-travel.md  reconcile.md  compaction.md
 docs/evidence/g1..g10_*.txt  dwd_ads.txt  source_reconcile_report.*
 reports/source_reconcile_report.*
 ```
 
-## Next phases (not in this commit)
+## Phase 10 checklist (this branch)
 
-Phase 10+: further polish / optional pytest-only packaging (out of G10 scope).
+- [x] pytest + static config tests
+- [x] light GitHub Actions CI
+- [ ] `make demo` ALL PASS + `DEMO_EXIT=0` (local evidence)
+- [ ] §27 remaining boxes after demo evidence
