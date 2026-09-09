@@ -3,7 +3,7 @@
 #
 # Dedicated table ods.ods_compact_demo (does NOT mutate golden-path ODS counts):
 #   1) CREATE with write-only=true so writers skip compaction
-#   2) Many small-batch writes (default 30×100 = 3k rows, chunked sql-client sessions → many L0 files)
+#   2) Many small-batch writes (default 30×100 = 3k rows via datagen, chunked sql-client → many L0 files)
 #   3) Record before: snapshot count, file count, total file size, query latency, fingerprint
 #   4) CALL sys.compact (Flink 1.18 positional args; compact_strategy=full in batch)
 #   5) Record after: file count, size, latency, fingerprint
@@ -25,7 +25,7 @@ mkdir -p "$EVIDENCE_DIR"
 TABLE="ods.ods_compact_demo"
 TABLE_BARE="ods_compact_demo"
 # Batches × rows_per_batch — keep thousands of rows + multiple commits for file_count>1.
-# Default 30×100=3000 (was 50×200≈10k): one giant multi-INSERT truncated mid-VALUES on demo.
+# Default 30×100=3000 via datagen (avoid multi-row VALUES → N Calc ops / network buffer exhaustion).
 COMPACT_BATCHES="${COMPACT_BATCHES:-30}"
 COMPACT_ROWS_PER_BATCH="${COMPACT_ROWS_PER_BATCH:-100}"
 # How many INSERT statements per sql-client -f session (1–5). Prefer small; wait each chunk.
@@ -164,19 +164,33 @@ timed_dump_to() {
   echo "LATENCY_MS=${ms}"
 }
 
-# Emit INSERT SQL for one batch (stdout).
+# Emit one batch write via Flink datagen (NOT multi-row VALUES).
+# Large VALUES expands to Values→Calc[2]…Calc[N] and exhausts network buffers
+# ("required 512, but only 0 available") even with a bigger buffer pool.
 batch_insert_sql() {
   local start_id="$1"
   local n="$2"
-  python3 -c '
-import sys
-start=int(sys.argv[1]); n=int(sys.argv[2]); table=sys.argv[3]
-parts=[]
-for i in range(start, start+n):
-    parts.append(f"({i}, CAST({i}.01 AS DECIMAL(12,2)), '\''open'\'', TIMESTAMP '\''2026-09-09 12:00:00'\'')")
-print(f"INSERT INTO {table} VALUES")
-print(",\n".join(parts) + ";")
-' "$start_id" "$n" "$TABLE"
+  local end_id=$((start_id + n - 1))
+  local gen="_g10_gen_${start_id}_${end_id}"
+  cat <<SQL
+DROP TEMPORARY TABLE IF EXISTS ${gen};
+CREATE TEMPORARY TABLE ${gen} (
+  id BIGINT
+) WITH (
+  'connector' = 'datagen',
+  'number-of-rows' = '${n}',
+  'fields.id.kind' = 'sequence',
+  'fields.id.start' = '${start_id}',
+  'fields.id.end' = '${end_id}'
+);
+INSERT INTO ${TABLE}
+SELECT
+  id,
+  CAST(id AS DECIMAL(12, 2)) / 100,
+  'open',
+  TIMESTAMP '2026-09-09 12:00:00'
+FROM ${gen};
+SQL
 }
 
 # Cancel leftover G10 insert jobs (RESTARTING/RUNNING chew network buffers).
@@ -375,7 +389,7 @@ if ! [[ "$COMPACT_INSERTS_PER_SESSION" =~ ^[1-9][0-9]*$ ]] || (( COMPACT_INSERTS
   fail "COMPACT_INSERTS_PER_SESSION must be 1..5 (got ${COMPACT_INSERTS_PER_SESSION})"
 fi
 echo "[g10] writing ${COMPACT_BATCHES} batches × ${COMPACT_ROWS_PER_BATCH} rows (=${EXPECTED_ROWS}; write-only → many small files)"
-echo "[g10] write path: chunked docker compose cp + sql-client -f (${COMPACT_INSERTS_PER_SESSION} INSERT(s)/session; wait FINISHED each chunk)"
+echo "[g10] write path: datagen→INSERT SELECT per chunk (sql-client -f; no multi-row VALUES)"
 echo "[g10] session knobs: parallelism.default=1"
 
 # Clear leftover FAILED/RESTARTING compact inserts from prior runs (frees TM network buffers).
@@ -502,7 +516,7 @@ rm -f "$BEFORE_DUMP" "$AFTER_DUMP"
   echo "table=${TABLE}"
   echo "method=CALL sys.compact('ods.ods_compact_demo', '', '', '', 'sink.parallelism=1', '', '', 'full')"
   echo "flink=1.18.1 positional procedure args; paimon=1.4.2; compact_strategy=full; runtime-mode=batch"
-  echo "write_mode=write-only=true; chunked sql-client -f (${COMPACT_INSERTS_PER_SESSION} INSERT/session; scale=${COMPACT_BATCHES}x${COMPACT_ROWS_PER_BATCH})"
+  echo "write_mode=write-only=true; datagen→INSERT SELECT (${COMPACT_INSERTS_PER_SESSION}/session; scale=${COMPACT_BATCHES}x${COMPACT_ROWS_PER_BATCH})"
   echo "batches=${COMPACT_BATCHES} rows_per_batch=${COMPACT_ROWS_PER_BATCH} row_count=${ROW_CNT}"
   echo "BEFORE snapshot_count=${BEFORE_SNAP} file_count=${BEFORE_FILE_COUNT} total_file_size_bytes=${BEFORE_FILE_SIZE} query_latency_ms=${BEFORE_LATENCY_MS}"
   echo "AFTER  snapshot_count=${AFTER_SNAP} file_count=${AFTER_FILE_COUNT} total_file_size_bytes=${AFTER_FILE_SIZE} query_latency_ms=${AFTER_LATENCY_MS}"
