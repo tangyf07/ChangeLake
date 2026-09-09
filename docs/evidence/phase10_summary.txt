@@ -1,0 +1,15 @@
+Phase 10 / Engineering — in progress
+
+Branch: phase-10-engineering
+Scope (§27 / §24):
+- pytest unit + static config
+- Makefile: test / lint / ci
+- GitHub Actions: lint + pytest (NOT full Docker E2E)
+- README honesty: Full Golden Path is local Docker E2E
+- demo_golden_path prints DEMO_EXIT=0|2
+- docs/semantics.md + docs/limitations.md retained
+- evidence: this file + pytest log after local verify
+
+Stop when: make test PASS + make demo ALL PASS + DEMO_EXIT=0 + §27 checklist.
+
+NOT claimed: CI covers Flink CDC E2E.
