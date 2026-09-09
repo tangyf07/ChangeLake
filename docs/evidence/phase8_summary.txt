@@ -1,15 +1,11 @@
-Phase 8 authoring (GitHub API) — Reconcile / G9
-Base: main tip 8ee247678d7a6205b1edb26023e23a2725eb8cae
-Branch: phase-8-reconcile
+Phase 8 local verify (WSL Docker) @ 2026-09-09 Asia/Shanghai
+SHA under test: 20ccf151ba9074cd9e5b431d4168be2569acd66d (phase-8-reconcile)
+FLINK_UI_PORT=18081; slots=10
 
-Delivered:
-- scripts/reconcile.sh + python/reconcile_report.py (DECIMAL, tolerance 0.01)
-- make reconcile; docs/reconcile.md; evidence/report stubs
-- demo_golden_path wires G9 after G8
-- README / golden-path / limitations updated
+Results:
+- demo_golden_path G1–G6 + P5 + G7 + G8 + G9: ALL PASS (DEMO_EXIT=0)
+- G9: pass=68 fail=0 tolerance=0.01 decimal_only=yes
+- users/orders/items counts match; orders.amount.total 8433.60==8433.60; dt(+channel) all PASS; DWD optional OK
 
-Local Docker E2E not claimed by this authoring commit — run:
-  make jars && make up && make wait && make smoke-storage && make demo
-or standalone after G5+: make reconcile
-
-NOT claimed: continuous monitoring; EO-2PC; G10 compaction
+Evidence: docs/evidence/g9_reconcile.txt + source_reconcile_report.{csv,json}
+NOT claimed: continuous monitoring; EO-2PC; G10
