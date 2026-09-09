@@ -1,0 +1,21 @@
+# ChangeLake Phase 2 evidence
+# Host: WSL Docker on tangyf
+# Branch: phase-2-cdc @ 72e5fb7168f1b5430816c864e8a27c262e9ca4c7
+# Date: 2026-09-09 (Asia/Shanghai)
+# Commands: bash scripts/smoke_storage.sh ; bash scripts/demo_golden_path.sh
+# Result: smoke PASS; G1–G4 ALL PASS; DEMO_EXIT=0
+
+[smoke_storage] PASS Flink → Paimon → MinIO write/read
+SMOKE_EXIT=0
+
+[G1] PASS initial snapshot
+source.users=20 lake.ods_users=20
+source.orders=50 lake.ods_orders=50
+source.order_items=85 lake.ods_order_items=85
+
+[G2] PASS insert
+[G3] PASS update
+[G4] PASS delete
+
+ALL PASS (G1–G4)
+DEMO_EXIT=0
