@@ -12,13 +12,35 @@
 │ SQL STATEMENT SET│  job name: changelake-ods-cdc
 └────────┬─────────┘
          │ PK upsert (changelog-producer=input)
+         │ paimon-s3-1.4.2.jar
          ▼
 ┌──────────────────┐
-│ Paimon 1.4.2     │  file:///warehouse
+│ MinIO            │  named volume minio_data
+│ bucket changelake│
+│ s3://changelake/warehouse
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ Paimon 1.4.2     │  S3 warehouse (path-style)
 │ ods.ods_users    │
 │ ods.ods_orders   │  current-state mirror
 │ ods.ods_order_items │
 └──────────────────┘
 ```
 
-No Kafka. No MinIO. Filesystem catalog only.
+## Architecture Decision — MinIO for Paimon warehouse
+
+**Stop:** `file:///warehouse`, host bind mounts for the warehouse, and chmod/root/VirtioFS
+workarounds aimed at local Paimon `LocalFileIO`.
+
+**Start:** MinIO with named volume `minio_data`; Paimon catalog warehouse
+`s3://changelake/warehouse` using official Paimon 1.4.2 S3 options
+(`s3.endpoint`, `s3.access-key`, `s3.secret-key`, `s3.path.style.access=true`).
+
+**Why:** On Docker Desktop (WSL2 / VirtioFS), Paimon local filesystem writers hit
+`Mkdirs failed to create .../bucket-*`. Object storage avoids that class of local-FS
+mkdir races for the lakehouse path. Flink checkpoints remain on named volumes for now
+(not Phase 6 scope).
+
+No Kafka / HDFS / Hive / Airflow.

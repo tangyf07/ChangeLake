@@ -19,6 +19,14 @@ PIPELINE_JOB_NAME="${PIPELINE_JOB_NAME:-changelake-ods-cdc}"
 CDC_WAIT_TIMEOUT="${CDC_WAIT_TIMEOUT:-180}"
 CDC_POLL_INTERVAL="${CDC_POLL_INTERVAL:-5}"
 
+# MinIO / Paimon S3 warehouse (demo-only defaults; match .env.example)
+MINIO_ROOT_USER="${MINIO_ROOT_USER:-minioadmin}"
+MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-minioadmin}"
+MINIO_ENDPOINT="${MINIO_ENDPOINT:-http://minio:9000}"
+MINIO_BUCKET="${MINIO_BUCKET:-changelake}"
+PAIMON_WAREHOUSE="${PAIMON_WAREHOUSE:-s3://changelake/warehouse}"
+S3_PATH_STYLE_ACCESS="${S3_PATH_STYLE_ACCESS:-true}"
+
 mysql_exec() {
   docker compose exec -T mysql mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" "$@"
 }
@@ -89,19 +97,32 @@ sys.exit(1)
   return 1
 }
 
+paimon_catalog_ddl() {
+  # Official Paimon 1.4.2 S3/MinIO options:
+  # https://paimon.apache.org/docs/1.4/maintenance/filesystems/
+  cat <<SQL
+CREATE CATALOG paimon WITH (
+  'type' = 'paimon',
+  'warehouse' = '${PAIMON_WAREHOUSE}',
+  's3.endpoint' = '${MINIO_ENDPOINT}',
+  's3.access-key' = '${MINIO_ROOT_USER}',
+  's3.secret-key' = '${MINIO_ROOT_PASSWORD}',
+  's3.path.style.access' = '${S3_PATH_STYLE_ACCESS}'
+);
+SQL
+}
+
 paimon_sql() {
   local tmp sql_file
   tmp="$(mktemp)"
   sql_file="$(mktemp)"
   {
-    cat <<'HDR'
+    cat <<HDR
 SET 'execution.runtime-mode' = 'batch';
 SET 'sql-client.execution.result-mode' = 'tableau';
 -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
-CREATE CATALOG paimon WITH (
-  'type' = 'paimon',
-  'warehouse' = 'file:///warehouse'
-);
+-- Warehouse: MinIO S3 (not local file:///).
+$(paimon_catalog_ddl)
 USE CATALOG paimon;
 HDR
     cat

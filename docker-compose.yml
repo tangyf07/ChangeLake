@@ -1,7 +1,11 @@
-# ChangeLake Phase 2 — MySQL + Flink JM/TM + Paimon filesystem warehouse
-# CDC jars (flink-sql-connector-mysql-cdc + mysql-connector-j) loaded from ./flink/lib
+# ChangeLake Phase 2 — MySQL + Flink JM/TM + MinIO (Paimon S3 warehouse)
+# CDC jars (flink-sql-connector-mysql-cdc + mysql-connector-j + paimon-s3) from ./flink/lib
 # via container entrypoint. Pipeline started by scripts/start_pipeline.sh.
-# Demo credentials only — see README.
+# Demo credentials only — see README / .env.example.
+#
+# Architecture Decision: Paimon warehouse is s3://changelake/warehouse on MinIO.
+# Local file:///warehouse bind mounts were removed — Docker Desktop / VirtioFS Mkdirs
+# failures made LocalFileIO unreliable for Paimon writers.
 
 services:
   mysql:
@@ -37,23 +41,72 @@ services:
     networks:
       - changelake
 
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    container_name: changelake-minio
+    hostname: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      - changelake
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-07-21T05-28-08Z
+    container_name: changelake-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+        mc mb --ignore-existing local/$${MINIO_BUCKET}
+        mc anonymous set none local/$${MINIO_BUCKET} || true
+        echo "[minio-init] bucket ready: $${MINIO_BUCKET}"
+        mc ls local/
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-changelake}
+    networks:
+      - changelake
+    restart: "no"
+
   jobmanager:
     image: flink:1.18.1-scala_2.12-java17
     container_name: changelake-jobmanager
     hostname: jobmanager
-    # demo-only: named volumes are root-owned; Flink image USER=flink cannot mkdir under /checkpoints
+    # demo-only: named checkpoint volumes are root-owned; Flink image USER=flink cannot mkdir
     user: "0"
-    # Copy optional Paimon/Hadoop jars from ./flink/lib into Flink lib, then start JM.
+    depends_on:
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
         set -euo pipefail
-        mkdir -p /checkpoints /savepoints /warehouse
-        chmod -R 777 /checkpoints /savepoints /warehouse || true
+        mkdir -p /checkpoints /savepoints
+        chmod -R 777 /checkpoints /savepoints || true
         if compgen -G "/jars/*.jar" > /dev/null; then
           cp -f /jars/*.jar /opt/flink/lib/
           echo "[changelake] installed jars from /jars into /opt/flink/lib"
-          ls -1 /opt/flink/lib/*paimon* /opt/flink/lib/*hadoop* 2>/dev/null || true
+          ls -1 /opt/flink/lib/*paimon* /opt/flink/lib/*hadoop* /opt/flink/lib/*mysql* 2>/dev/null || true
         else
           echo "[changelake] no jars in /jars yet (run: make jars)"
         fi
@@ -61,6 +114,10 @@ services:
     ports:
       - "${FLINK_UI_PORT:-8081}:8081"
     environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      PAIMON_WAREHOUSE: ${PAIMON_WAREHOUSE:-s3://changelake/warehouse}
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
@@ -75,11 +132,8 @@ services:
       - ./flink/lib:/jars:ro
       - ./flink/sql:/opt/flink/sql-changelake:ro
       - ./flink/config/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml.changelake:ro
-      # Shared bind mounts (JM+TM must see same warehouse). Use parallelism=1 to avoid
-      # Docker Desktop virtiofs mkdir races in Paimon LocalFileIO.
-      - ./data/warehouse:/warehouse
-      - ./data/checkpoints:/checkpoints
-      - ./data/savepoints:/savepoints
+      - flink_checkpoints:/checkpoints
+      - flink_savepoints:/savepoints
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8081/overview >/dev/null || exit 1"]
       interval: 10s
@@ -97,12 +151,16 @@ services:
     depends_on:
       jobmanager:
         condition: service_started
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
         set -euo pipefail
-        mkdir -p /checkpoints /savepoints /warehouse
-        chmod -R 777 /checkpoints /savepoints /warehouse || true
+        mkdir -p /checkpoints /savepoints
+        chmod -R 777 /checkpoints /savepoints || true
         if compgen -G "/jars/*.jar" > /dev/null; then
           cp -f /jars/*.jar /opt/flink/lib/
           echo "[changelake] installed jars from /jars into /opt/flink/lib"
@@ -111,6 +169,10 @@ services:
         fi
         exec /docker-entrypoint.sh taskmanager
     environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      PAIMON_WAREHOUSE: ${PAIMON_WAREHOUSE:-s3://changelake/warehouse}
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
@@ -124,17 +186,20 @@ services:
       - ./flink/lib:/jars:ro
       - ./flink/sql:/opt/flink/sql-changelake:ro
       - ./flink/config/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml.changelake:ro
-      # Shared bind mounts (JM+TM must see same warehouse). Use parallelism=1 to avoid
-      # Docker Desktop virtiofs mkdir races in Paimon LocalFileIO.
-      - ./data/warehouse:/warehouse
-      - ./data/checkpoints:/checkpoints
-      - ./data/savepoints:/savepoints
+      - flink_checkpoints:/checkpoints
+      - flink_savepoints:/savepoints
     networks:
       - changelake
 
 volumes:
   mysql_data:
     name: changelake_mysql_data
+  minio_data:
+    name: changelake_minio_data
+  flink_checkpoints:
+    name: changelake_flink_checkpoints
+  flink_savepoints:
+    name: changelake_flink_savepoints
 
 networks:
   changelake:

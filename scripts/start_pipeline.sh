@@ -9,18 +9,20 @@ source "$ROOT/scripts/common.sh"
 echo "[pipeline] ensuring CDC grants on MySQL user"
 mysql_root_exec < "$ROOT/mysql/003_cdc_grants.sql"
 
-echo "[pipeline] ensuring jars present (Paimon + CDC + MySQL JDBC)"
+echo "[pipeline] ensuring jars present (Paimon + paimon-s3 + CDC + MySQL JDBC)"
 need_jars=0
 compgen -G "$ROOT/flink/lib/flink-sql-connector-mysql-cdc-*.jar" >/dev/null || need_jars=1
 compgen -G "$ROOT/flink/lib/paimon-flink-*.jar" >/dev/null || need_jars=1
+compgen -G "$ROOT/flink/lib/paimon-s3-*.jar" >/dev/null || need_jars=1
 compgen -G "$ROOT/flink/lib/mysql-connector-j-*.jar" >/dev/null || need_jars=1
 if (( need_jars == 1 )); then
   bash "$ROOT/scripts/bootstrap.sh" --jars-only
 fi
 
 # Jars are copied into /opt/flink/lib only at container start. Restart if CDC jar missing inside.
-if ! docker compose exec -T jobmanager bash -lc 'compgen -G "/opt/flink/lib/flink-sql-connector-mysql-cdc-*.jar" >/dev/null'; then
-  echo "[pipeline] CDC jar not in JM lib yet — restarting jobmanager/taskmanager to pick up /jars"
+if ! docker compose exec -T jobmanager bash -lc 'compgen -G "/opt/flink/lib/flink-sql-connector-mysql-cdc-*.jar" >/dev/null' \
+  || ! docker compose exec -T jobmanager bash -lc 'compgen -G "/opt/flink/lib/paimon-s3-*.jar" >/dev/null'; then
+  echo "[pipeline] CDC/paimon-s3 jar not in JM lib yet — restarting jobmanager/taskmanager to pick up /jars"
   docker compose restart jobmanager taskmanager
   bash "$ROOT/scripts/wait_services.sh"
 fi

@@ -2,6 +2,8 @@
 
 Script: `scripts/demo_golden_path.sh` (also `make demo`).
 
+**Prereq:** MinIO healthy + bucket, then `scripts/smoke_storage.sh` PASS (Flink → Paimon → MinIO). G1 must pass before G2–G4.
+
 | Case | Action | Pass criteria |
 | --- | --- | --- |
 | G1 | Start CDC pipeline (initial snapshot) | MySQL counts == ODS counts (20/50/85) + PK spot-checks |

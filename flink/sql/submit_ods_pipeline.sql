@@ -9,9 +9,15 @@ SET 'table.exec.sink.upsert-materialize' = 'NONE';
 SET 'parallelism.default' = '1';
 
 -- Session-scoped: CREATE CATALOG every submit (Flink has no IF NOT EXISTS for catalogs).
+-- MinIO S3 warehouse (demo-only keys; match .env.example). Docs:
+-- https://paimon.apache.org/docs/1.4/maintenance/filesystems/
 CREATE CATALOG paimon WITH (
   'type' = 'paimon',
-  'warehouse' = 'file:///warehouse'
+  'warehouse' = 's3://changelake/warehouse',
+  's3.endpoint' = 'http://minio:9000',
+  's3.access-key' = 'minioadmin',
+  's3.secret-key' = 'minioadmin',
+  's3.path.style.access' = 'true'
 );
 
 USE CATALOG paimon;
