@@ -333,5 +333,5 @@ reports/source_reconcile_report.*
 
 - [x] pytest + static config tests
 - [x] light GitHub Actions CI
-- [ ] `make demo` ALL PASS + `DEMO_EXIT=0` (local evidence)
-- [ ] §27 remaining boxes after demo evidence
+- [x] `make demo` ALL PASS + `DEMO_EXIT=0` (local evidence; tip evidence `693e195`)
+- [x] §27 engineering boxes (README / semantics / limitations / evidence / pytest / demo)
