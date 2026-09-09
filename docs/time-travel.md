@@ -11,7 +11,7 @@ ODS counts (`ods_orders` 20/50/85 story) stay intact.
 | **`ods.ods_tt_demo`** | **Yes** | Isolated PK table; insert/update/delete story for `order_id=100` |
 
 Honest: this is a **snapshot-id based demo** of Paimon batch time travel.
-It is **not** EO-2PC, **not** continuous CDC time travel on the live ODS job, and **not** G9–G10.
+It is **not** EO-2PC, **not** continuous CDC time travel on the live ODS job, and **not** G10.
 
 ## Story (three snapshots)
 
@@ -115,6 +115,6 @@ so short demos are unlikely to expire S1–S3 before assertions.
 
 - **EO-2PC** / Exactly-Once end-to-end
 - Time travel as a substitute for CDC correctness proofs (G1–G6)
-- G9 full reconcile suite / G10 compaction (Phase 8+)
+- G10 compaction (Phase 9+); G9 reconcile is separate (`docs/reconcile.md`)
 - Guaranteed long-term snapshot retention in production
 - Continuous streaming time travel on the live `changelake-ods-cdc` job

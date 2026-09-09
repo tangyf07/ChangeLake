@@ -1,0 +1,492 @@
+{
+  "report": "source_reconcile_report",
+  "tolerance": "0.01",
+  "decimal_only": true,
+  "pass_count": 68,
+  "fail_count": 0,
+  "overall": "PASS",
+  "rows": [
+    {
+      "metric": "users.count",
+      "source": "20",
+      "lake": "20",
+      "diff": "0",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.count",
+      "source": "52",
+      "lake": "52",
+      "diff": "0",
+      "status": "PASS"
+    },
+    {
+      "metric": "order_items.count",
+      "source": "85",
+      "lake": "85",
+      "diff": "0",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.total",
+      "source": "8433.60",
+      "lake": "8433.60",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-01",
+      "source": "170.00",
+      "lake": "170.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-02",
+      "source": "200.00",
+      "lake": "200.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-03",
+      "source": "472.50",
+      "lake": "472.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-04",
+      "source": "412.22",
+      "lake": "412.22",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-05",
+      "source": "392.50",
+      "lake": "392.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-06",
+      "source": "227.50",
+      "lake": "227.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-07",
+      "source": "352.50",
+      "lake": "352.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-08",
+      "source": "257.50",
+      "lake": "257.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-09",
+      "source": "405.00",
+      "lake": "405.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-10",
+      "source": "80.00",
+      "lake": "80.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-11",
+      "source": "352.50",
+      "lake": "352.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-12",
+      "source": "312.50",
+      "lake": "312.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-13",
+      "source": "262.50",
+      "lake": "262.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-14",
+      "source": "352.50",
+      "lake": "352.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-15",
+      "source": "90.00",
+      "lake": "90.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-16",
+      "source": "405.00",
+      "lake": "405.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-17",
+      "source": "255.00",
+      "lake": "255.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-18",
+      "source": "392.50",
+      "lake": "392.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-19",
+      "source": "405.00",
+      "lake": "405.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-20",
+      "source": "272.50",
+      "lake": "272.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-21",
+      "source": "292.50",
+      "lake": "292.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-22",
+      "source": "427.50",
+      "lake": "427.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-23",
+      "source": "397.50",
+      "lake": "397.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-24",
+      "source": "260.00",
+      "lake": "260.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-25",
+      "source": "182.50",
+      "lake": "182.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-26",
+      "source": "357.50",
+      "lake": "357.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-27",
+      "source": "222.50",
+      "lake": "222.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-28",
+      "source": "80.00",
+      "lake": "80.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-09-01",
+      "source": "88.88",
+      "lake": "88.88",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-09-09",
+      "source": "55.00",
+      "lake": "55.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-01.channel=NULL",
+      "source": "170.00",
+      "lake": "170.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-02.channel=NULL",
+      "source": "90.00",
+      "lake": "90.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-02.channel=app",
+      "source": "110.00",
+      "lake": "110.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-03.channel=NULL",
+      "source": "472.50",
+      "lake": "472.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-04.channel=NULL",
+      "source": "412.22",
+      "lake": "412.22",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-05.channel=NULL",
+      "source": "392.50",
+      "lake": "392.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-06.channel=NULL",
+      "source": "227.50",
+      "lake": "227.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-07.channel=NULL",
+      "source": "352.50",
+      "lake": "352.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-08.channel=NULL",
+      "source": "257.50",
+      "lake": "257.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-09.channel=NULL",
+      "source": "405.00",
+      "lake": "405.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-10.channel=NULL",
+      "source": "80.00",
+      "lake": "80.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-11.channel=NULL",
+      "source": "352.50",
+      "lake": "352.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-12.channel=NULL",
+      "source": "312.50",
+      "lake": "312.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-13.channel=NULL",
+      "source": "262.50",
+      "lake": "262.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-14.channel=NULL",
+      "source": "352.50",
+      "lake": "352.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-15.channel=NULL",
+      "source": "90.00",
+      "lake": "90.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-16.channel=NULL",
+      "source": "405.00",
+      "lake": "405.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-17.channel=NULL",
+      "source": "255.00",
+      "lake": "255.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-18.channel=NULL",
+      "source": "392.50",
+      "lake": "392.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-19.channel=NULL",
+      "source": "405.00",
+      "lake": "405.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-20.channel=NULL",
+      "source": "272.50",
+      "lake": "272.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-21.channel=NULL",
+      "source": "292.50",
+      "lake": "292.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-22.channel=NULL",
+      "source": "427.50",
+      "lake": "427.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-23.channel=NULL",
+      "source": "397.50",
+      "lake": "397.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-24.channel=NULL",
+      "source": "260.00",
+      "lake": "260.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-25.channel=NULL",
+      "source": "182.50",
+      "lake": "182.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-26.channel=NULL",
+      "source": "357.50",
+      "lake": "357.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-27.channel=NULL",
+      "source": "222.50",
+      "lake": "222.50",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-08-28.channel=NULL",
+      "source": "80.00",
+      "lake": "80.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-09-01.channel=NULL",
+      "source": "88.88",
+      "lake": "88.88",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "orders.amount.dt=2026-09-09.channel=web",
+      "source": "55.00",
+      "lake": "55.00",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "dwd.orders.count_vs_mysql",
+      "source": "52",
+      "lake": "52",
+      "diff": "0",
+      "status": "PASS"
+    },
+    {
+      "metric": "dwd.orders.amount.total_vs_mysql",
+      "source": "8433.60",
+      "lake": "8433.60",
+      "diff": "0.00",
+      "status": "PASS"
+    },
+    {
+      "metric": "dwd.orders.net_amount.total_vs_mysql",
+      "source": "8433.60",
+      "lake": "8433.60",
+      "diff": "0.00",
+      "status": "PASS"
+    }
+  ],
+  "notes": [
+    "Current-state MySQL ↔ lake reconcile (demo check).",
+    "Amount comparisons use decimal.Decimal; abs(diff) <= tolerance.",
+    "ODS amount-by-channel keeps NULL as NULL (ADS 'unknown' is separate).",
+    "NOT claimed: continuous monitoring / EO-2PC / Exactly-Once E2E."
+  ]
+}
