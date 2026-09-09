@@ -234,6 +234,7 @@ print(f"[g10] cancelled {n} active compact INSERT job(s); ignoring {len(ignored)
 # ("Insufficient number of network buffers: required 512, but only 0 available").
 wait_insert_jobs_finished() {
   local timeout="${1:-90}"
+  local since_ms="${2:-0}"
   local deadline=$((SECONDS + timeout))
   local report
   while (( SECONDS < deadline )); do
@@ -241,6 +242,7 @@ wait_insert_jobs_finished() {
 import json, urllib.request, sys
 ui = sys.argv[1]
 ignore_path = sys.argv[2]
+since_ms = int(sys.argv[3])
 ignore = set()
 try:
     with open(ignore_path, encoding="utf-8") as f:
@@ -260,20 +262,17 @@ for j in data.get("jobs", []):
     low = name.lower()
     state = (j.get("state") or "").upper()
     jid = j.get("jid") or j.get("id") or "?"
-    if not ("insert" in low or "ods_compact" in low or "compact_demo" in low):
+    start = int(j.get("start-time") or 0)
+    if "compact" not in low and "ods_compact" not in low:
         continue
-    if not ("compact" in low or "ods_compact" in low):
-        # generic insert jobs from other demos — only track active by name insert+compact already filtered loosely
-        if "compact" not in low:
-            continue
     if state in active_states:
         active += 1
-    elif state == "FAILED" and jid not in ignore:
+    elif state == "FAILED" and jid not in ignore and (since_ms <= 0 or start >= since_ms - 2000):
         failed.append(f"{jid}:{state}:{name}")
 print(f"OK:{active}:{len(failed)}")
 for f in failed[:5]:
     print(f"FAILJOB:{f}")
-' "$(flink_ui)" "${G10_IGNORE_FAILED_JIDS:-/tmp/changelake_g10_ignore_failed_jids.txt}" 2>/dev/null || echo "ERR:python")"
+' "$(flink_ui)" "${G10_IGNORE_FAILED_JIDS:-/tmp/changelake_g10_ignore_failed_jids.txt}" "$since_ms" 2>/dev/null || echo "ERR:python")"
     if [[ "$report" == ERR:* ]] || [[ "$(echo "$report" | head -1)" == ERR:* ]]; then
       echo "[g10] WARN: Flink jobs overview unavailable; relying on sql-client -f wait"
       return 0
@@ -284,8 +283,21 @@ for f in failed[:5]:
     fail_n="${head##*:}"
     if [[ "$fail_n" =~ ^[0-9]+$ ]] && (( fail_n > 0 )); then
       echo "$report" | grep '^FAILJOB:' | head -5 || true
-      cancel_compact_insert_jobs || true
-      fail "INSERT job FAILED (network buffers / Flink). See FAILJOB lines above; fix then re-run make compaction"
+      # Print root exception for first FAILJOB
+      fj="$(echo "$report" | grep '^FAILJOB:' | head -1 | sed 's/^FAILJOB://')"
+      jid="${fj%%:*}"
+      if [[ -n "$jid" && "$jid" != "?" ]]; then
+        python3 -c '
+import json,urllib.request,sys
+ui=sys.argv[1].rstrip("/"); jid=sys.argv[2]
+try:
+  d=json.load(urllib.request.urlopen(ui+f"/jobs/{jid}/exceptions",timeout=10))
+  print(d.get("root-exception","")[:2500])
+except Exception as e:
+  print(f"(no exception body: {e})")
+' "$(flink_ui)" "$jid" || true
+      fi
+      fail "INSERT job FAILED. See FAILJOB + root-exception above"
     fi
     if [[ "$active_n" =~ ^[0-9]+$ ]] && (( active_n == 0 )); then
       return 0
@@ -387,12 +399,13 @@ while (( batch_num < COMPACT_BATCHES )); do
     done
   } >"$WRITE_SQL"
   echo "[g10] submitting chunk batches $((batch_num - chunk_n + 1))–${batch_num}/${COMPACT_BATCHES} (${chunk_n} INSERT(s), ids up to $((next_id - 1)))"
+  CHUNK_SUBMIT_MS="$(python3 -c 'import time; print(int(time.time()*1000))')"
   if ! paimon_sql <"$WRITE_SQL" >/dev/null; then
     rm -f "$WRITE_SQL"
     fail "chunked INSERT failed at batch≈${batch_num}/${COMPACT_BATCHES}"
   fi
   rm -f "$WRITE_SQL"
-  wait_insert_jobs_finished 90
+  wait_insert_jobs_finished 90 "$CHUNK_SUBMIT_MS"
 done
 
 # Verify row count with timeout (eventual visibility after last commit)
