@@ -1,0 +1,99 @@
+DWD/ADS Phase 5 verification
+CHECK_DT=2026-08-02
+paid_status_set=('paid','shipped','completed')
+null_channel_ads_literal=unknown
+coupon_amount=NULL (not in ODS); net_amount=amount
+ADS_mode=batch INSERT OVERWRITE (re-runnable)
+DWD_mode=streaming ODS→DWD (changelake-dwd-orders)
+MySQL expectations:
+app	1	1	110.00	110.00	1
+unknown	1	0	0.00	0.00	0
+ADS rows:
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 6:36:10 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[34;1m[INFO] Executing SQL from file.[0m
+
+Command history file path: /root/.flink-sql-history
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+> -- Warehouse: MinIO S3 (not local file:///).
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> SELECT channel,
+>        CAST(order_cnt AS STRING) AS order_cnt,
+>        CAST(paid_order_cnt AS STRING) AS paid_order_cnt,
+>        CAST(gmv AS STRING) AS gmv,
+>        CAST(net_gmv AS STRING) AS net_gmv,
+>        CAST(buyer_cnt AS STRING)+---------+-----------+----------------+--------+---------+-----------+
+| channel | order_cnt | paid_order_cnt |    gmv | net_gmv | buyer_cnt |
++---------+-----------+----------------+--------+---------+-----------+
+|     app |         1 |              1 | 110.00 |  110.00 |         1 |
+| unknown |         1 |              0 |   0.00 |    0.00 |         0 |
++---------+-----------+----------------+--------+---------+-----------+
+2 rows in set
+
+Flink SQL> 
+Shutting down the session...
+done.
+DWD sample order_id=1:
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+WARNING: Unknown module: jdk.compiler specified to --add-exports
+Sep 09, 2026 6:35:40 AM org.jline.utils.Log logr
+WARNING: Unable to create a system terminal, creating a dumb terminal (enable debug logging for more information)
+[34;1m[INFO] Executing SQL from file.[0m
+
+Command history file path: /root/.flink-sql-history
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> -- Flink has no CREATE CATALOG IF NOT EXISTS; catalog is session-scoped.
+> -- Warehouse: MinIO S3 (not local file:///).
+> CREATE CATALOG paimon WITH (
+>   'type' = 'paimon',
+>   'warehouse' = 's3://changelake/warehouse',
+>   's3.endpoint' = 'http://minio:9000',
+>   's3.access-key' = 'minioadmin',
+>   's3.secret-key' = 'minioadmin',
+>   's3.path.style.access' = 'true'
+> )[34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> [34;1m[INFO] Execute statement succeed.[0m
+
+Flink SQL> SELECT order_id,
+>        CAST(amount AS STRING) AS amount,
+>        CAST(coupon_amount AS STRING) AS coupon_amount,
+>        CAST(net_amount AS STRING) AS net_amount,
+>        CASE WHEN channel IS NULL THEN 'IS_NULL' ELSE CAST(channel AS STRING)+----------+--------+---------------+------------+-------------+
+| order_id | amount | coupon_amount | net_amount | channel_chk |
++----------+--------+---------------+------------+-------------+
+|        1 | 110.00 |        <NULL> |     110.00 |         app |
++----------+--------+---------------+------------+-------------+
+1 row in set
+
+Flink SQL> 
+Shutting down the session...
+done.
+DWD SUM(net_amount)=200.00 MySQL SUM(amount)=200.00
+NOT claimed: EO-2PC / Exactly-Once E2E / continuous streaming ADS / G7–G10 / coupon_amount evolution
+PASS

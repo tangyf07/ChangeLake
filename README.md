@@ -2,15 +2,15 @@
 
 可复现的 CDC 增量湖仓演示：**MySQL → Flink CDC → Apache Paimon (MinIO)**。
 
-> **当前仓库状态：Phase 4（Failure Recovery / G6）**  
-> Flink SQL `mysql-cdc` → Paimon Primary Key ODS（current-state mirror）on **MinIO S3**。  
-> Golden Path **G1–G6**（含 ADD COLUMN 显式迁移 + TaskManager kill / checkpoint restore）。  
-> **尚未**实现 G7–G10、DWD/ADS、Backfill、全量 Reconcile、Compaction。  
-> **不声称** EO-2PC / Exactly-Once E2E。
+> **当前仓库状态：Phase 5（DWD + ADS）**  
+> Flink SQL `mysql-cdc` → Paimon ODS → **DWD** `dwd_orders` → **ADS** `ads_order_daily`（MinIO S3）。  
+> Golden Path **G1–G6 + P5**（G5 显式迁移 + G6 TM kill/restore + DWD/ADS 业务校验）。  
+> **尚未**实现 G7–G10、Backfill、全量 Reconcile、Compaction。  
+> **不声称** EO-2PC / Exactly-Once E2E / 连续流式 ADS。
 
 ## Why
 
-业务库里的可变关系数据，如何通过 CDC 进入现代湖仓，并在 UPDATE / DELETE / **DDL** / **TM 故障**后仍保持当前状态正确——Phase 4 在 G1–G5 基础上加入 Failure Recovery（checkpoint → kill TM → restore；不声称 EO-2PC）。
+业务库里的可变关系数据，如何通过 CDC 进入现代湖仓，并在 UPDATE / DELETE / **DDL** / **TM 故障**后仍保持当前状态正确，再冻结 DWD 语义并产出 ADS 日指标——Phase 5 在 G1–G6 基础上加入 `dwd_orders` / `ads_order_daily`（ADS 为可重跑 batch refresh；不声称 EO-2PC）。
 
 ## Architecture Decision (storage)
 
@@ -20,7 +20,7 @@
 
 **原因：** Docker Desktop 本地 FS / VirtioFS 上 Paimon `Mkdirs failed`；对象存储避开该类本地 mkdir 问题。Flink checkpoint 仍用 named volume（G6 依赖 `/checkpoints` 在 TM kill 后仍可读）。
 
-## Architecture (Phase 4)
+## Architecture (Phase 5)
 
 ```text
 MySQL 8.0.40 (ROW binlog + GTID)
@@ -34,6 +34,8 @@ Flink 1.18.1  +  flink-sql-connector-mysql-cdc 3.1.1
 Paimon 1.4.2 PK tables  (paimon-s3-1.4.2.jar)
   warehouse: s3://changelake/warehouse  →  MinIO
   ods.ods_users / ods.ods_orders (+ channel after G5) / ods.ods_order_items
+  dwd.dwd_orders  (Phase 5; net_amount = amount while coupon absent)
+  ads.ads_order_daily  (Phase 5; dt + channel; NULL channel → 'unknown')
 ```
 
 Named volumes: `changelake_mysql_data`, `changelake_minio_data`,
@@ -57,10 +59,11 @@ Named volumes: `changelake_mysql_data`, `changelake_minio_data`,
 - Flink CDC MySQL: https://nightlies.apache.org/flink/flink-cdc-docs-release-3.1/docs/connectors/flink-sources/mysql-cdc/
 - Schema evolution: [`docs/schema-evolution.md`](docs/schema-evolution.md)
 - Failure recovery: [`docs/failure-recovery.md`](docs/failure-recovery.md)
+- DWD/ADS: [`docs/dwd-ads.md`](docs/dwd-ads.md)
 
 ## Quickstart
 
-推荐运行顺序：**up → MinIO healthy/bucket → smoke_storage → demo_golden_path (G1→G6)**。
+推荐运行顺序：**up → MinIO healthy/bucket → smoke_storage → demo_golden_path (G1→G6→P5)**。
 
 ```bash
 cp .env.example .env          # demo credentials only (incl. MinIO minioadmin/minioadmin)
@@ -70,7 +73,7 @@ bash scripts/bootstrap.sh --jars-only
 docker compose up -d
 bash scripts/wait_services.sh
 bash scripts/smoke_storage.sh          # Flink → Paimon → MinIO MUST PASS
-bash scripts/demo_golden_path.sh       # G1→G6
+bash scripts/demo_golden_path.sh       # G1→G6→P5
 ```
 
 有 GNU Make 时：
@@ -112,6 +115,20 @@ bash scripts/failure_recovery.sh
 # 或: make failure-recovery
 ```
 
+### DWD + ADS (Phase 5)
+
+需 ODS 已有 `channel`（先跑 G5 / `schema_evolution.sh`）。校验脚本会尽量自启 ODS 并触发演进。
+
+Flink `taskmanager.numberOfTaskSlots=10`（`docker-compose.yml` `FLINK_PROPERTIES`）。改完后需 `docker compose up -d --force-recreate taskmanager jobmanager`。提交顺序：DWD → ≥1 checkpoint → ADS batch `FINISHED`。
+
+```bash
+bash scripts/verify_dwd_ads.sh
+# 或: make dwd-ads
+# 仅提交作业: bash scripts/start_dwd_ads.sh / make start-dwd-ads
+```
+
+期望：`[DWD/ADS] PASS`；证据 `docs/evidence/dwd_ads.txt`。
+
 ### Storage smoke
 
 ```bash
@@ -121,7 +138,7 @@ bash scripts/smoke_storage.sh
 
 期望：`[smoke_storage] PASS Flink → Paimon → MinIO write/read`（断言 **SELECT 结果行**含 `minio-ok`）。
 
-### Golden Path G1–G6
+### Golden Path G1–G6 + P5
 
 ```bash
 bash scripts/demo_golden_path.sh
@@ -137,7 +154,8 @@ bash scripts/demo_golden_path.sh
 [G4] PASS delete
 [G5] PASS schema evolution
 [G6] PASS failure recovery
-ALL PASS (G1–G6)
+[DWD/ADS] PASS
+ALL PASS (G1–G6 + P5)
 ```
 
 任一失败：`exit 2`（不会仅 WARNING 后继续）。
@@ -150,8 +168,9 @@ ALL PASS (G1–G6)
 | G4 | DELETE → current-state 查询为空 |
 | G5 | ADD `channel`；`1→app` / `900002→web` / `2→NULL`；pipeline RUNNING |
 | G6 | ≥1 checkpoint → kill TM → restore → Paimon == MySQL（`order_id=3,900003`） |
+| P5 | DWD `net_amount` + ADS 日指标 vs MySQL（默认 `CHECK_DT=2026-08-02`） |
 
-Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`（由 demo/G6 脚本写入；未跑 Docker 时 g6 为 NOT RUN stub）。
+Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`、`dwd_ads.txt`（由 demo / verify 写入；未跑 Docker 时为 NOT RUN stub）。
 
 ### Schema evolution support matrix (honest)
 
@@ -175,7 +194,7 @@ Evidence：`docs/evidence/g1_*.txt` … `g6_*.txt`（由 demo/G6 脚本写入；
 
 金额均为 `DECIMAL(12,2)`。重新灌数：`make seed` / `bash scripts/seed.sh`。
 
-## Guarantees (Phase 4 only)
+## Guarantees (Phase 5)
 
 ```text
 MinIO warehouse for Paimon (scripted smoke)
@@ -184,10 +203,11 @@ Primary-key current-state upsert (ODS)
 INSERT / UPDATE / DELETE propagation (G2–G4)
 Schema evolution within documented support matrix (G5 explicit migration)
 TaskManager kill + checkpoint restore → ODS == MySQL (scripted G6)
-Automated Golden Path G1–G6
+DWD order semantic freeze + ADS daily metrics vs MySQL (scripted P5)
+Automated Golden Path G1–G6 + P5
 ```
 
-**Not claimed:** Exactly-Once E2E / **EO-2PC**、透明 SQL-CDC DDL、G7–G10、生产 HA/SLA、checkpoint-on-S3、Pipeline YAML auto schema sync。
+**Not claimed:** Exactly-Once E2E / **EO-2PC**、连续流式 ADS、透明 SQL-CDC DDL、G7–G10、`coupon_amount` CDC、生产 HA/SLA、checkpoint-on-S3、Pipeline YAML auto schema sync。
 
 ## Credentials
 
@@ -195,7 +215,7 @@ Automated Golden Path G1–G6
 
 ## Limitations
 
-详见 [`docs/limitations.md`](docs/limitations.md)。语义：[`docs/semantics.md`](docs/semantics.md)。架构：[`docs/architecture.md`](docs/architecture.md)。Schema Evolution：[`docs/schema-evolution.md`](docs/schema-evolution.md)。Failure Recovery：[`docs/failure-recovery.md`](docs/failure-recovery.md)。
+详见 [`docs/limitations.md`](docs/limitations.md)。语义：[`docs/semantics.md`](docs/semantics.md)。架构：[`docs/architecture.md`](docs/architecture.md)。Schema Evolution：[`docs/schema-evolution.md`](docs/schema-evolution.md)。Failure Recovery：[`docs/failure-recovery.md`](docs/failure-recovery.md)。DWD/ADS：[`docs/dwd-ads.md`](docs/dwd-ads.md)。
 
 ## Layout
 
@@ -204,13 +224,15 @@ docker-compose.yml          # mysql + minio (+ init) + flink JM/TM (10s CP + res
 Makefile / .env.example
 mysql/001_schema.sql  002_seed.sql  003_cdc_grants.sql
 mysql/mutations/{insert,update,delete,schema_evolution*,failure_recovery*}.sql
-flink/sql/paimon_catalog.sql  cdc_source.sql  ods.sql
+flink/sql/paimon_catalog.sql  cdc_source.sql  ods.sql  dwd.sql  ads.sql
 flink/sql/submit_ods_pipeline.sql  submit_ods_pipeline_evolved.sql
-scripts/schema_evolution.sh  failure_recovery.sh  demo_golden_path.sh  …
-docs/schema-evolution.md  failure-recovery.md  limitations.md  golden-path.md
-docs/evidence/g1..g6_*.txt
+flink/sql/submit_dwd_pipeline.sql  submit_ads_pipeline.sql
+scripts/schema_evolution.sh  failure_recovery.sh  start_dwd_ads.sh  verify_dwd_ads.sh
+scripts/demo_golden_path.sh  …
+docs/schema-evolution.md  failure-recovery.md  dwd-ads.md  limitations.md  golden-path.md
+docs/evidence/g1..g6_*.txt  dwd_ads.txt
 ```
 
 ## Next phases (not in this commit)
 
-Phase 5+: DWD/ADS、Backfill、Time Travel、Reconcile、Compaction（G7–G10）。
+Phase 6+: Backfill、Time Travel、Reconcile、Compaction（G7–G10）。

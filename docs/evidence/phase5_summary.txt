@@ -1,0 +1,13 @@
+Phase 5 local verify (WSL Docker) @ 2026-09-09 Asia/Shanghai
+SHA under test: 4888630280d95afa52996941c373be11fd02029a (phase-5-dwd-ads)
+FLINK_UI_PORT=18081; taskmanager.numberOfTaskSlots=10
+
+Results:
+- demo_golden_path G1–G6 + P5: ALL PASS (DEMO_EXIT=0)
+- P5: DWD checkpoint→rows→ADS FINISHED; ADS MATCH app/unknown for CHECK_DT=2026-08-02
+- DWD SUM(net_amount)=200.00 == MySQL SUM(amount)=200.00 for dt=2026-08-02
+- Fixes included: slots=10; DWD wait checkpoint before ADS; mysql_scalar uses MYSQL_DATABASE
+
+Evidence: docs/evidence/dwd_ads.txt (this commit)
+NOT claimed: EO-2PC; streaming ADS; coupon CDC; G7–G10
+Non-blocking D1: cold smoke_storage SMOKE_EXIT=2
