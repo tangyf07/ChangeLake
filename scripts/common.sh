@@ -232,3 +232,63 @@ WHERE TABLE_SCHEMA='changelake' AND TABLE_NAME='orders' AND COLUMN_NAME='channel
     mysql_exec -e "ALTER TABLE orders DROP COLUMN channel;" >/dev/null
   fi
 }
+
+flink_job_id() {
+  # Print RUNNING job id matching needle, or exit 1.
+  local needle="${1:-$PIPELINE_JOB_NAME}"
+  python3 -c "
+import json, urllib.request, sys
+ui, needle = sys.argv[1], sys.argv[2]
+data = json.load(urllib.request.urlopen(ui + '/jobs/overview', timeout=10))
+for j in data.get('jobs', []):
+    name = j.get('name') or ''
+    state = (j.get('state') or '').upper()
+    if needle in name and state == 'RUNNING':
+        print(j.get('jid') or j.get('id'))
+        sys.exit(0)
+sys.exit(1)
+" "$(flink_ui)" "$needle"
+}
+
+flink_completed_checkpoint_count() {
+  # flink_completed_checkpoint_count <job_id>
+  local jid="$1"
+  python3 -c "
+import json, urllib.request, sys
+ui, jid = sys.argv[1], sys.argv[2]
+try:
+    data = json.load(urllib.request.urlopen(ui + f'/jobs/{jid}/checkpoints', timeout=10))
+except Exception:
+    print(0)
+    sys.exit(0)
+print(int((data.get('counts') or {}).get('completed') or 0))
+" "$(flink_ui)" "$jid"
+}
+
+wait_flink_checkpoint() {
+  # wait_flink_checkpoint [min_completed=1] [timeout_s] [job_name_needle]
+  # Polls Flink REST /jobs/{jid}/checkpoints until counts.completed >= min.
+  local min_completed="${1:-1}"
+  local timeout="${2:-$CDC_WAIT_TIMEOUT}"
+  local needle="${3:-$PIPELINE_JOB_NAME}"
+  local deadline=$((SECONDS + timeout))
+  local jid count
+  echo "[common] waiting for ≥${min_completed} completed checkpoint(s) on '*${needle}*' (timeout=${timeout}s)"
+  while (( SECONDS < deadline )); do
+    jid="$(flink_job_id "$needle" 2>/dev/null || true)"
+    if [[ -n "${jid:-}" ]]; then
+      count="$(flink_completed_checkpoint_count "$jid")"
+      echo "[common] job=${jid} completed_checkpoints=${count}"
+      if (( count >= min_completed )); then
+        echo "[common] checkpoint gate passed (completed=${count})"
+        return 0
+      fi
+    else
+      echo "[common] job not RUNNING yet while waiting for checkpoint"
+    fi
+    sleep 3
+  done
+  echo "[common] TIMEOUT waiting for completed checkpoints (≥${min_completed})" >&2
+  return 1
+}
+

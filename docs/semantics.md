@@ -1,4 +1,4 @@
-# Semantics (Phase 3 scope: G1–G5)
+# Semantics (Phase 4 scope: G1–G6)
 
 ## CDC
 
@@ -33,7 +33,10 @@ All money columns are `DECIMAL(12,2)` end-to-end (MySQL, Flink, Paimon). No `FLO
 
 ## Duplicates / recovery (honest)
 
-Flink checkpointing is enabled (`execution.checkpointing.interval=30s`). Phase 2 **does not** run a fault-injection experiment; do not read this as a proven EO-2PC guarantee. Paimon PK upsert is idempotent w.r.t. duplicate same-key values, which helps after at-least-once replay, but that is not an E2E exactly-once proof.
+Flink checkpointing is enabled (`execution.checkpointing.interval=10s`, dir `file:///checkpoints`).
+Phase 4 **G6** runs a TaskManager kill + restore experiment and asserts Paimon current-state
+matches MySQL after catch-up. That proves **practical recovery**, **not** EO-2PC / Exactly-Once E2E.
+Paimon PK upsert is idempotent w.r.t. duplicate same-key values, which helps after at-least-once replay.
 
 
 ## Schema Evolution (G5)
@@ -62,3 +65,20 @@ ODS shows channel; old rows NULL; new DML syncs values
 
 Flink SQL `mysql-cdc` 3.1.1 table schemas are fixed at submit time. Pipeline YAML schema
 evolution is out of MVP scope. Details: [`schema-evolution.md`](schema-evolution.md).
+
+
+## Failure Recovery (G6)
+
+```text
+≥1 completed checkpoint (Flink REST)
+        ↓
+MySQL UPDATE/INSERT (order_id=3, 900003)
+        ↓
+docker kill TaskManager → compose up taskmanager
+        ↓
+Job RUNNING (fixed-delay restart from checkpoint)
+        ↓
+More UPDATEs → ODS == MySQL
+```
+
+Details: [`failure-recovery.md`](failure-recovery.md).

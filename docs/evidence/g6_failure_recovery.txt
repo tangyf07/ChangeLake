@@ -1,0 +1,10 @@
+G6 Failure Recovery
+status=NOT RUN
+reason=Requires local Docker (kill TaskManager + Flink REST checkpoints). Authoring environment did not execute E2E.
+checkpoint_dir=file:///checkpoints
+checkpoint_interval=10s
+state_backend=hashmap
+restart-strategy=fixed-delay
+script=scripts/failure_recovery.sh
+expected_pass_line=[G6] PASS failure recovery
+NOT claimed: EO-2PC / Exactly-Once E2E / multi-JM HA / checkpoint-on-S3

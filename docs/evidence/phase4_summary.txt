@@ -1,0 +1,5 @@
+Phase 4 scripts ready (Failure Recovery / G6)
+Base SHA: cee99ab7c53085aa818c362498afcd9ccb748eb1
+Local Docker E2E: NOT RUN in authoring environment
+Expect after laptop run: [G6] PASS failure recovery ; ALL PASS (G1–G6)
+See docs/failure-recovery.md
