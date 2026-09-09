@@ -1,4 +1,4 @@
-# ChangeLake Phase 4 (G1–G6 failure recovery) — MinIO warehouse
+# ChangeLake Phase 5 (DWD + ADS) — MinIO warehouse; G1–G6 + P5
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
@@ -7,10 +7,10 @@ ENV_FILE := .env
 
 .PHONY: help up down reset seed jars bootstrap wait status ps logs mysql-cli flink-sql \
 	pipeline stop-pipeline demo mutate-insert mutate-update mutate-delete schema-evolution \
-	failure-recovery minio-init smoke-storage
+	failure-recovery minio-init smoke-storage start-dwd-ads dwd-ads
 
 help:
-	@echo "ChangeLake Phase 4 targets:"
+	@echo "ChangeLake Phase 5 targets:"
 	@echo "  make jars            Download Paimon + paimon-s3 + Hadoop + Flink CDC + MySQL JDBC"
 	@echo "  make up              cp .env.example .env (if missing) && compose up -d"
 	@echo "  make wait            Wait until MinIO + MySQL + Flink UI are healthy"
@@ -21,10 +21,12 @@ help:
 	@echo "  make stop-pipeline   Cancel ODS CDC job"
 	@echo "  make schema-evolution  G5 explicit migration (ADD channel + evolved resubmit)"
 	@echo "  make failure-recovery  G6 TM kill + checkpoint restore (pipeline must be RUNNING)"
-	@echo "  make demo            Golden Path G1–G6 (bash scripts/demo_golden_path.sh)"
+	@echo "  make start-dwd-ads   Submit DWD streaming + ADS batch refresh"
+	@echo "  make dwd-ads         Verify DWD + ADS metrics (scripts/verify_dwd_ads.sh)"
+	@echo "  make demo            Golden Path G1–G6 + P5 DWD/ADS"
 	@echo "  make down / reset / status / mysql-cli / bootstrap"
 	@echo "  Note: FLINK_UI_PORT from .env (default 8081; use 18081 if busy)"
-	@echo "  Order: jars → up → wait → smoke-storage → demo"
+	@echo "  Order: jars → up → wait → smoke-storage → demo  (or dwd-ads after G5)"
 
 jars:
 	bash scripts/bootstrap.sh --jars-only
@@ -97,3 +99,9 @@ mysql-cli:
 
 flink-sql:
 	$(COMPOSE) exec jobmanager ./bin/sql-client.sh
+
+start-dwd-ads:
+	bash scripts/start_dwd_ads.sh
+
+dwd-ads:
+	bash scripts/verify_dwd_ads.sh

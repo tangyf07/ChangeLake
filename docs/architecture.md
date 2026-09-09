@@ -1,4 +1,4 @@
-# Architecture (Phase 4)
+# Architecture (Phase 5)
 
 ```text
 ┌──────────────────┐
@@ -24,8 +24,10 @@
 ┌──────────────────┐
 │ Paimon 1.4.2     │  S3 warehouse (path-style)
 │ ods.ods_users    │
-│ ods.ods_orders   │  current-state mirror
+│ ods.ods_orders   │  current-state mirror (+ channel after G5)
 │ ods.ods_order_items │
+│ dwd.dwd_orders   │  Phase 5 semantic freeze (net_amount)
+│ ads.ads_order_daily │ Phase 5 daily metrics (batch refresh)
 └──────────────────┘
 ```
 
@@ -64,3 +66,14 @@ G6 kills `changelake-taskmanager` after ≥1 completed checkpoint on named volum
 checkpoint; mysql-cdc resumes from stored offsets; Paimon PK ODS converges to MySQL.
 
 See [`failure-recovery.md`](failure-recovery.md). **Not** an EO-2PC claim.
+
+
+## DWD / ADS (Phase 5)
+
+Streaming **ODS → DWD** (`changelake-dwd-orders`) freezes order-grain business fields
+(`net_amount = amount` while `coupon_amount` is absent; NULL `channel` tolerated).
+
+**ADS** `ads.ads_order_daily` is refreshed with a **batch** `INSERT OVERWRITE` from DWD
+(dimensions `dt` + `channel` with NULL → literal `unknown`). See [`dwd-ads.md`](dwd-ads.md).
+
+G7–G10 / Phase 6+ remain unimplemented. **Not** an EO-2PC claim.

@@ -1,0 +1,14 @@
+DWD/ADS Phase 5 verification
+STATUS: NOT RUN
+CHECK_DT=(set locally, default 2026-08-02)
+paid_status_set=('paid','shipped','completed')
+null_channel_ads_literal=unknown
+coupon_amount=NULL (not in ODS); net_amount=amount
+ADS_mode=batch INSERT OVERWRITE (re-runnable)
+DWD_mode=streaming ODS→DWD (changelake-dwd-orders)
+
+Fill by running on a machine with Docker:
+  bash scripts/verify_dwd_ads.sh
+  # or: make dwd-ads
+
+NOT claimed: EO-2PC / Exactly-Once E2E / continuous streaming ADS / G7–G10 / coupon_amount evolution

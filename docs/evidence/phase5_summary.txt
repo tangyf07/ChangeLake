@@ -1,0 +1,15 @@
+Phase 5 (DWD + ADS) — evidence summary
+STATUS: NOT RUN locally in this commit (authoring via GitHub API)
+
+Deliverables:
+- flink/sql/dwd.sql, ads.sql, submit_dwd_pipeline.sql, submit_ads_pipeline.sql
+- scripts/start_dwd_ads.sh, scripts/verify_dwd_ads.sh
+- docs/dwd-ads.md + docs/evidence/dwd_ads.txt (NOT RUN stub)
+- Makefile targets: start-dwd-ads, dwd-ads
+- demo_golden_path.sh P5 block after G6 (not G7–G10)
+
+Fill evidence:
+  bash scripts/verify_dwd_ads.sh
+  # or: make dwd-ads
+
+NOT claimed: EO-2PC / continuous streaming ADS / G7–G10 / coupon_amount CDC
