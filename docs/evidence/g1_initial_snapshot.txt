@@ -1,3 +1,42 @@
-# Stub — filled by scripts/demo_golden_path.sh when G1–G4 are run locally.
-# Case: g1_initial_snapshot
-# Status: NOT RUN in authoring environment (no Docker on build agent).
+# ChangeLake Phase 2 evidence
+# Host: WSL Docker on tangyf
+# Branch: phase-2-cdc @ 72e5fb7168f1b5430816c864e8a27c262e9ca4c7
+# Date: 2026-09-09 (Asia/Shanghai)
+# Commands: bash scripts/smoke_storage.sh ; bash scripts/demo_golden_path.sh
+# Result: smoke PASS; G1–G4 ALL PASS; DEMO_EXIT=0
+
+==================================================
+[G1] Initial Snapshot
+==================================================
+[wait] ODS counts == MySQL (20/50/85) (timeout=180s)
+ changelake-jobmanager Copying /tmp/tmp.iKHbi3do7w to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.iKHbi3do7w to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.wcPGTiPRHb to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.wcPGTiPRHb to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.6KV2tPbTog to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.6KV2tPbTog to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.9RDtHWpanQ to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.9RDtHWpanQ to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.BY1EeIDemp to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.BY1EeIDemp to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.0PLDaaorun to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.0PLDaaorun to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.pDxv27QYIl to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.pDxv27QYIl to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.TaEasGakmO to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.TaEasGakmO to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.TeS4pWrUFe to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.TeS4pWrUFe to changelake-jobmanager:/tmp/changelake_query.sql
+source.users           = 20
+lake.ods_users         = 20
+source.orders          = 50
+lake.ods_orders        = 50
+source.order_items     = 85
+lake.ods_order_items   = 85
+ changelake-jobmanager Copying /tmp/tmp.dwn1K9TOWj to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.dwn1K9TOWj to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.3QgamHGN7q to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.3QgamHGN7q to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copying /tmp/tmp.AUMM8EvSNV to changelake-jobmanager:/tmp/changelake_query.sql
+ changelake-jobmanager Copied /tmp/tmp.AUMM8EvSNV to changelake-jobmanager:/tmp/changelake_query.sql
+[G1] PASS initial snapshot
