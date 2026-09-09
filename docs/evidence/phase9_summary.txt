@@ -1,0 +1,13 @@
+Phase 9 / G10 Compaction — authoring stub
+Base main: cee8705b0b3edf87a93a36717bbf642d63046507
+Branch: phase-9-compaction
+
+Delivered:
+- scripts/compaction.sh + verify_compaction.sh
+- docs/compaction.md + docs/evidence/g10_compaction.txt
+- Wired into demo_golden_path.sh after G9; make compaction
+- Dedicated table ods.ods_compact_demo (write-only small batches → CALL sys.compact full)
+- Hard: fingerprint identical; Soft: file count reduced; latency recorded only
+
+Local Docker E2E (fill g10_compaction.txt with real Before/After) is for the operator machine.
+NOT claimed: production sizing SLA; EO-2PC; latency % drop guarantee.
