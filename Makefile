@@ -1,4 +1,4 @@
-# ChangeLake Phase 9 (Compaction / G10) — MinIO warehouse; G1–G6 + P5 + G7 + G8 + G9 + G10
+# ChangeLake Phase 10 (Engineering) — G1–G10 + pytest / light CI / docs / evidence
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
@@ -7,10 +7,11 @@ ENV_FILE := .env
 
 .PHONY: help up down reset seed jars bootstrap wait status ps logs mysql-cli flink-sql \
 	pipeline stop-pipeline demo mutate-insert mutate-update mutate-delete schema-evolution \
-	failure-recovery minio-init smoke-storage start-dwd-ads dwd-ads backfill time-travel reconcile compaction
+	failure-recovery minio-init smoke-storage start-dwd-ads dwd-ads backfill time-travel reconcile compaction \
+	test lint ci
 
 help:
-	@echo "ChangeLake Phase 9 targets:"
+	@echo "ChangeLake Phase 10 targets:"
 	@echo "  make jars            Download Paimon + paimon-s3 + Hadoop + Flink CDC + MySQL JDBC"
 	@echo "  make up              cp .env.example .env (if missing) && compose up -d"
 	@echo "  make wait            Wait until MinIO + MySQL + Flink UI are healthy"
@@ -28,9 +29,13 @@ help:
 	@echo "  make time-travel     G8 Paimon snapshot time travel (ods.ods_tt_demo)"
 	@echo "  make reconcile       G9 MySQL ↔ ODS reconcile report (DECIMAL, tol=0.01)"
 	@echo "  make compaction      G10 Paimon compaction demo (ods.ods_compact_demo)"
+	@echo "  make test            pytest (unit + static config)"
+	@echo "  make lint            python compileall + bash -n scripts"
+	@echo "  make ci              lint + test (what GitHub Actions runs)"
 	@echo "  make down / reset / status / mysql-cli / bootstrap"
 	@echo "  Note: FLINK_UI_PORT from .env (default 8081; use 18081 if busy)"
 	@echo "  Order: jars → up → wait → smoke-storage → demo  (or dwd-ads / backfill / time-travel / reconcile / compaction)"
+	@echo "  CI is unit/static only; Full Golden Path is local Docker E2E (make demo)"
 
 jars:
 	bash scripts/bootstrap.sh --jars-only
@@ -122,3 +127,12 @@ reconcile:
 
 compaction:
 	bash scripts/compaction.sh
+
+lint:
+	python3 -m compileall -q python tests
+	@for f in scripts/*.sh; do bash -n "$$f"; done
+
+test:
+	python3 -m pytest -q
+
+ci: lint test
