@@ -1,7 +1,7 @@
-# Limitations (Phase 5)
+# Limitations (Phase 6)
 
-ChangeLake Phase 5 delivers **MySQL → Flink CDC → Paimon ODS** for Golden Path **G1–G6**,
-plus **DWD + ADS** business metrics (`dwd.dwd_orders`, `ads.ads_order_daily`).
+ChangeLake Phase 6 delivers **MySQL → Flink CDC → Paimon ODS** for Golden Path **G1–G6**,
+plus **DWD + ADS** (`dwd.dwd_orders`, `ads.ads_order_daily`), plus **G7 date-scoped backfill**.
 
 ## Architecture Decision (storage)
 
@@ -13,7 +13,7 @@ Paimon warehouse is **MinIO (S3-compatible)**, not `file:///warehouse`.
   (`file:///checkpoints`; G6 depends on this volume surviving TM kill — not moved to S3).
 - Demo MinIO keys (`minioadmin` / `minioadmin`) are **demo-only**.
 
-## What Phase 5 includes
+## What Phase 6 includes
 
 - Docker Compose: MySQL 8.0.40 + Flink 1.18.1 JobManager/TaskManager + MinIO
 - Deterministic seed (`seed=42`): `users=20` / `orders=50` / `order_items=85`
@@ -28,14 +28,17 @@ Paimon warehouse is **MinIO (S3-compatible)**, not `file:///warehouse`.
   (`scripts/failure_recovery.sh`, `docs/failure-recovery.md`)
 - **DWD** `dwd.dwd_orders` streaming from ODS (`scripts/start_dwd_ads.sh`)
 - **ADS** `ads.ads_order_daily` batch refresh + `scripts/verify_dwd_ads.sh` / `make dwd-ads`
+- **G7 Backfill** `scripts/backfill.sh` / `make backfill DT=...` + `scripts/verify_backfill.sh`
+  (MySQL snapshot → dt-scoped DWD/ADS replace; idempotent fingerprint)
 - Flink checkpoint interval **10s**, dir `file:///checkpoints`, fixed-delay restart
 - Mutation helpers for INSERT / UPDATE / DELETE / schema evolution
 - Flink UI via `FLINK_UI_PORT` (default `8081`; conflict example `18081`)
 - Works without GNU Make (`bash` + `docker compose`)
 
-## What Phase 5 does **not** include
+## What Phase 6 does **not** include
 
-- **G7–G10** (backfill, time travel, reconcile suite, compaction)
+- **G8–G10** (time travel, full reconcile suite, compaction)
+- General-purpose backfill orchestrator (Airflow/etc.) — G7 is **demo** partition-scoped logic
 - Continuous streaming ADS aggregation (Phase 5 uses **batch** `INSERT OVERWRITE`)
 - `coupon_amount` MySQL/ODS evolution (DWD column is NULL; `net_amount = amount`)
 - Kafka / HDFS / Hive / Airflow / Kubernetes / Prometheus / Grafana / Web UI / LLM
@@ -80,6 +83,7 @@ Schema evolution design: [`schema-evolution.md`](schema-evolution.md)
 | Transparent SQL-CDC DDL without resubmit | **Not supported / not claimed** |
 | TM kill + checkpoint restore | G6 (scripted) |
 | DWD net_amount + ADS daily metrics | P5 / `verify_dwd_ads` (scripted) |
+| Date-scoped backfill + idempotent fingerprint | G7 / `verify_backfill` (scripted) |
 | EO-2PC / Exactly-Once E2E | **Not claimed** |
 
 Local Docker E2E must be run on a machine with Docker; CI / authoring agents do not claim full CDC E2E unless evidence files are filled by a local run.
@@ -90,6 +94,7 @@ Local Docker E2E must be run on a machine with Docker; CI / authoring agents do 
 - Schema evolution for ADD COLUMN uses **job resubmit with evolved Flink SQL**, not Pipeline YAML auto-DDL.
 - Recovery after TaskManager kill is **scripted in G6**; do **not** read that as EO-2PC.
 - ADS metrics are proven via **batch refresh + MySQL comparison** for a known `dt`; not continuous streaming ADS.
+- G7 backfill repairs **one logical `dt`** from MySQL into DWD/ADS; it is **not** EO-2PC and **not** a general orchestrator.
 - NULL `channel` in DWD is mapped to ADS literal **`unknown`** (see `docs/dwd-ads.md`).
 - Demo credentials only (see `.env.example`), including MinIO `minioadmin`/`minioadmin`.
 - Dataset is synthetic and laptop-scale.
@@ -100,5 +105,5 @@ Local Docker E2E must be run on a machine with Docker; CI / authoring agents do 
 
 - If `Bind for 0.0.0.0:8081 failed`: set `FLINK_UI_PORT=18081` (or free port) in `.env`, then `docker compose up -d`.
 - After downloading new jars (especially `paimon-s3`), restart JM/TM so `/jars` is copied into `/opt/flink/lib`.
-- Recommended order: **MinIO healthy + bucket → `smoke_storage` PASS → Golden Path G1→G6 → P5 DWD/ADS**.
+- Recommended order: **MinIO healthy + bucket → `smoke_storage` PASS → Golden Path G1→G6 → P5 → G7**.
 - No `make`? Use the bash equivalents in README Quickstart.

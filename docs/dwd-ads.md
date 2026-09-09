@@ -9,7 +9,8 @@ Business semantic freeze and daily metrics on top of ODS.
 | DWD | `dwd.dwd_orders` | Order-grain current state; `net_amount` rule |
 | ADS | `ads.ads_order_daily` | Daily metrics by `(dt, channel)` |
 
-**Not in Phase 5:** G7–G10, Backfill, Time Travel, Reconcile, Compaction, `coupon_amount` MySQL/ODS evolution.
+**Phase 5 scope here.** G7 Backfill is documented in [`backfill.md`](backfill.md) (Phase 6).
+**Still not claimed:** G8–G10, Time Travel, full Reconcile suite, Compaction, `coupon_amount` MySQL/ODS evolution.
 
 ## `dwd.dwd_orders` fields
 
@@ -97,7 +98,7 @@ Optional: `CHECK_DT=2026-08-02 bash scripts/verify_dwd_ads.sh` (default `2026-08
 
 Start jobs only: `bash scripts/start_dwd_ads.sh` / `make start-dwd-ads`.
 
-Golden path: `demo_golden_path.sh` runs a **P5 / DWD+ADS** block after G6 (does **not** invent G7–G10).
+Golden path: `demo_golden_path.sh` runs **P5** after G6, then **G7** backfill (does **not** invent G8–G10).
 
 ## Evidence
 

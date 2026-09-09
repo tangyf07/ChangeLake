@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ChangeLake Phase 5 Golden Path: G1–G6 + P5 DWD/ADS (not G7–G10).
+# ChangeLake Phase 6 Golden Path: G1–G6 + P5 DWD/ADS + G7 Backfill (not G8–G10).
 # Output format: spec §22. Hard fail → exit 2 (never WARNING-and-continue).
 set -euo pipefail
 
@@ -17,6 +17,7 @@ G4_STATUS=PENDING
 G5_STATUS=PENDING
 G6_STATUS=PENDING
 P5_STATUS=PENDING
+G7_STATUS=PENDING
 
 fail_case() {
   local id="$1"
@@ -32,6 +33,7 @@ fail_case() {
     G5) G5_STATUS=FAIL ;;
     G6) G6_STATUS=FAIL ;;
     P5|DWD/ADS) P5_STATUS=FAIL ;;
+    G7) G7_STATUS=FAIL ;;
   esac
   print_summary
   exit 2
@@ -49,6 +51,7 @@ pass_case() {
     G5) G5_STATUS=PASS ;;
     G6) G6_STATUS=PASS ;;
     P5|DWD/ADS) P5_STATUS=PASS ;;
+    G7) G7_STATUS=PASS ;;
   esac
 }
 
@@ -56,7 +59,7 @@ print_summary() {
   cat <<SUM
 
 ==================================================
-ChangeLake Golden Path (Phase 5: G1–G6 + P5)
+ChangeLake Golden Path (Phase 6: G1–G6 + P5 + G7)
 ==================================================
 
 G1  Initial Snapshot       ${G1_STATUS}
@@ -66,10 +69,11 @@ G4  Delete                 ${G4_STATUS}
 G5  Schema Evolution       ${G5_STATUS}
 G6  Failure Recovery       ${G6_STATUS}
 P5  DWD + ADS              ${P5_STATUS}
+G7  Backfill               ${G7_STATUS}
 
 SUM
-  if [[ "$G1_STATUS" == PASS && "$G2_STATUS" == PASS && "$G3_STATUS" == PASS && "$G4_STATUS" == PASS && "$G5_STATUS" == PASS && "$G6_STATUS" == PASS && "$P5_STATUS" == PASS ]]; then
-    echo "ALL PASS (G1–G6 + P5)"
+  if [[ "$G1_STATUS" == PASS && "$G2_STATUS" == PASS && "$G3_STATUS" == PASS && "$G4_STATUS" == PASS && "$G5_STATUS" == PASS && "$G6_STATUS" == PASS && "$P5_STATUS" == PASS && "$G7_STATUS" == PASS ]]; then
+    echo "ALL PASS (G1–G6 + P5 + G7)"
   else
     echo "FAILED"
   fi
@@ -93,7 +97,7 @@ wait_until() {
 }
 
 # --- Preconditions ---
-echo "[demo] ChangeLake Phase 4 Golden Path G1–G6"
+echo "[demo] ChangeLake Phase 6 Golden Path G1–G6 + P5 + G7"
 echo "[demo] Flink UI port: ${FLINK_UI_PORT} → $(flink_ui)"
 bash "$ROOT/scripts/wait_services.sh"
 
@@ -412,6 +416,20 @@ if ! bash "$ROOT/scripts/verify_dwd_ads.sh"; then
 fi
 
 pass_case P5 "DWD/ADS"
+
+# ==================================================
+# G7 Backfill (Phase 6 — not G8–G10)
+# ==================================================
+echo
+echo "=================================================="
+echo "[G7] Backfill"
+echo "=================================================="
+
+if ! bash "$ROOT/scripts/verify_backfill.sh"; then
+  fail_case G7 "backfill" "see scripts/verify_backfill.sh / docs/evidence/g7_backfill.txt"
+fi
+
+pass_case G7 "backfill"
 
 print_summary
 exit 0
