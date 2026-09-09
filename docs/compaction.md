@@ -17,7 +17,10 @@ counts and reconcile expectations. G10 therefore writes many small batches onto
 
 1. `CREATE TABLE ods.ods_compact_demo … WITH ('write-only' = 'true', 'bucket' = '1')`  
    Writers skip compaction/snapshot expiration ([Paimon dedicated compaction](https://paimon.apache.org/docs/1.4/maintenance/dedicated-compaction/)).
-2. Insert **many small batches** (default **50 × 200 ≈ 10 000** rows) → many L0 files / snapshots.
+2. Insert **many small batches** in **chunked** sql-client sessions (default **30 × 100 = 3 000** rows;
+   `COMPACT_INSERTS_PER_SESSION` INSERTs per `-f` run, default **1**) → many L0 files / snapshots.
+   Do **not** submit one giant multi-INSERT blob (that truncated mid-VALUES on the demo stack).
+   After writes, poll `COUNT(*)` until it reaches the expected row count.
 3. **Before**: snapshot count, file count, total `file_size_in_bytes`, query latency, content fingerprint (SHA256 of ordered `id/amount/status`).
 4. Run compaction via Flink SQL procedure (batch, **full** strategy):
 
@@ -49,6 +52,13 @@ counts and reconcile expectations. G10 therefore writes many small batches onto
 | Query latency | Wall time of ordered dump SQL (ms; noisy on tiny local data) |
 | Fingerprint | SHA256 of sorted `id\tamount\tstatus` lines from current-state SELECT |
 
+## Write path (G10)
+
+Each chunk builds a small SQL file; `paimon_sql` **`docker compose cp`s** it into
+`jobmanager` and runs **`sql-client.sh -f`**. Chunks wait for INSERT jobs to leave
+RUNNING (FINISHED) before the next chunk. Scale defaults to **30×100** so the demo
+stays reliable while still producing multiple commits / `file_count > 1` before compact.
+
 ## How to run
 
 ```bash
@@ -71,8 +81,10 @@ Env knobs:
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
-| `COMPACT_BATCHES` | `50` | Number of INSERT commits |
-| `COMPACT_ROWS_PER_BATCH` | `200` | Rows per commit (~10k total) |
+| `COMPACT_BATCHES` | `30` | Number of INSERT commits |
+| `COMPACT_ROWS_PER_BATCH` | `100` | Rows per commit (default **3k** total; override for larger) |
+| `COMPACT_INSERTS_PER_SESSION` | `1` | INSERTs per sql-client `-f` session (1–5) |
+| `COMPACT_ROW_WAIT_TIMEOUT` | `180` | Seconds to wait for `COUNT(*)` after writes |
 
 Success line: **`[G10] PASS compaction`**.
 

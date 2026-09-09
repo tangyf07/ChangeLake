@@ -3,7 +3,7 @@
 #
 # Dedicated table ods.ods_compact_demo (does NOT mutate golden-path ODS counts):
 #   1) CREATE with write-only=true so writers skip compaction
-#   2) Many small-batch writes (default 50×200 ≈ 10k rows → many L0 files)
+#   2) Many small-batch writes (default 30×100 = 3k rows, chunked sql-client sessions → many L0 files)
 #   3) Record before: snapshot count, file count, total file size, query latency, fingerprint
 #   4) CALL sys.compact (Flink 1.18 positional args; compact_strategy=full in batch)
 #   5) Record after: file count, size, latency, fingerprint
@@ -24,9 +24,14 @@ mkdir -p "$EVIDENCE_DIR"
 
 TABLE="ods.ods_compact_demo"
 TABLE_BARE="ods_compact_demo"
-# Batches × rows_per_batch ≈ ~10k CDC-style mutations (demo scale)
-COMPACT_BATCHES="${COMPACT_BATCHES:-50}"
-COMPACT_ROWS_PER_BATCH="${COMPACT_ROWS_PER_BATCH:-200}"
+# Batches × rows_per_batch — keep thousands of rows + multiple commits for file_count>1.
+# Default 30×100=3000 (was 50×200≈10k): one giant multi-INSERT truncated mid-VALUES on demo.
+COMPACT_BATCHES="${COMPACT_BATCHES:-30}"
+COMPACT_ROWS_PER_BATCH="${COMPACT_ROWS_PER_BATCH:-100}"
+# How many INSERT statements per sql-client -f session (1–5). Prefer small; wait each chunk.
+COMPACT_INSERTS_PER_SESSION="${COMPACT_INSERTS_PER_SESSION:-1}"
+# After writes, poll COUNT(*) until expected (or timeout).
+COMPACT_ROW_WAIT_TIMEOUT="${COMPACT_ROW_WAIT_TIMEOUT:-180}"
 # Latency query: ordered dump used for fingerprint (same SQL before/after)
 LATENCY_REPEAT="${LATENCY_REPEAT:-1}"
 
@@ -174,11 +179,79 @@ print(",\n".join(parts) + ";")
 ' "$start_id" "$n" "$TABLE"
 }
 
+# After a batch INSERT session, ensure no Flink INSERT jobs are still RUNNING.
+# sql-client -f in batch mode normally blocks until FINISHED; this is a safety poll.
+wait_insert_jobs_finished() {
+  local timeout="${1:-90}"
+  local deadline=$((SECONDS + timeout))
+  local active
+  while (( SECONDS < deadline )); do
+    active="$(python3 -c '
+import json, urllib.request, sys
+ui = sys.argv[1]
+try:
+    data = json.load(urllib.request.urlopen(ui + "/jobs/overview", timeout=8))
+except Exception as e:
+    print(f"ERR:{e}")
+    sys.exit(0)
+active_states = {"RUNNING", "RESTARTING", "CREATED", "INITIALIZING", "CANCELLING"}
+n = 0
+for j in data.get("jobs", []):
+    name = (j.get("name") or "").lower()
+    state = (j.get("state") or "").upper()
+    if state not in active_states:
+        continue
+    # Match Flink SQL insert job names; ignore CDC pipeline.
+    if "insert" in name or "ods_compact" in name or "compact_demo" in name:
+        n += 1
+print(n)
+' "$(flink_ui)" 2>/dev/null || echo 0)"
+    if [[ "$active" == ERR:* ]]; then
+      echo "[g10] WARN: Flink jobs overview unavailable (${active#ERR:}); relying on sql-client -f wait"
+      return 0
+    fi
+    if [[ "$active" =~ ^[0-9]+$ ]] && (( active == 0 )); then
+      return 0
+    fi
+    echo "[g10] waiting for INSERT job(s) FINISHED (active≈${active})"
+    sleep 2
+  done
+  echo "[g10] WARN: timed out waiting for INSERT jobs idle (continuing; COUNT(*) gate follows)"
+  return 0
+}
+
+# Poll COUNT(*) until it reaches expected (or timeout). Prints final count on stdout.
+wait_row_count() {
+  local expected="$1"
+  local timeout="${2:-$COMPACT_ROW_WAIT_TIMEOUT}"
+  local deadline=$((SECONDS + timeout))
+  local out cnt="0"
+  while (( SECONDS < deadline )); do
+    out="$(paimon_sql <<SQL
+SELECT COUNT(*) FROM ${TABLE};
+SQL
+)" || out=""
+    if cnt="$(echo "$out" | extract_plain_scalar 2>/dev/null)"; then
+      if [[ "$cnt" == "$expected" ]]; then
+        echo "$cnt"
+        return 0
+      fi
+      echo "[g10] waiting for row_count=${expected} (now=${cnt})" >&2
+    else
+      echo "[g10] waiting for row_count=${expected} (COUNT parse pending)" >&2
+      cnt="0"
+    fi
+    sleep 3
+  done
+  echo "$cnt"
+  return 1
+}
+
 echo "=================================================="
 echo "[G10] Compaction / Phase 9"
 echo "=================================================="
 echo "[g10] table=${TABLE} (dedicated; does not touch ods_orders / G1–G9 counts)"
-echo "[g10] plan: write-only small batches → stats/fingerprint → CALL sys.compact(full) → re-check"
+echo "[g10] plan: write-only chunked small batches → wait COUNT(*) → stats/fingerprint → CALL sys.compact(full) → re-check"
 echo "[g10] batches=${COMPACT_BATCHES} rows_per_batch=${COMPACT_ROWS_PER_BATCH} (~$((COMPACT_BATCHES * COMPACT_ROWS_PER_BATCH)) rows)"
 echo "[g10] compact: Flink 1.18 positional CALL sys.compact(..., compact_strategy='full') in batch mode"
 echo "[g10] hard gate: query fingerprint identical before vs after"
@@ -204,32 +277,43 @@ CREATE TABLE ods.ods_compact_demo (
 );
 SQL
 
-# ---- Many small-batch writes ----
-# One sql-client invocation with N INSERT statements → N commits/snapshots (many small files),
-# without paying sql-client startup per batch.
-echo "[g10] writing ${COMPACT_BATCHES} batches × ${COMPACT_ROWS_PER_BATCH} rows (write-only → many small files)"
-WRITE_SQL="$(mktemp)"
-{
-  next_id=1
-  for ((b = 1; b <= COMPACT_BATCHES; b++)); do
-    batch_insert_sql "$next_id" "$COMPACT_ROWS_PER_BATCH"
-    echo
-    next_id=$((next_id + COMPACT_ROWS_PER_BATCH))
-  done
-} >"$WRITE_SQL"
-echo "[g10] submitting ${COMPACT_BATCHES} INSERT statements in one Flink SQL session"
-paimon_sql <"$WRITE_SQL" >/dev/null || fail "multi-batch INSERT failed"
-rm -f "$WRITE_SQL"
+# ---- Many small-batch writes (chunked; never one giant multi-INSERT blob) ----
+# Each chunk: build a small SQL file → paimon_sql copies it into jobmanager and runs sql-client -f.
+# Default COMPACT_INSERTS_PER_SESSION=1 so each INSERT is its own session + commit.
 EXPECTED_ROWS=$((COMPACT_BATCHES * COMPACT_ROWS_PER_BATCH))
+if ! [[ "$COMPACT_INSERTS_PER_SESSION" =~ ^[1-9][0-9]*$ ]] || (( COMPACT_INSERTS_PER_SESSION < 1 || COMPACT_INSERTS_PER_SESSION > 5 )); then
+  fail "COMPACT_INSERTS_PER_SESSION must be 1..5 (got ${COMPACT_INSERTS_PER_SESSION})"
+fi
+echo "[g10] writing ${COMPACT_BATCHES} batches × ${COMPACT_ROWS_PER_BATCH} rows (=${EXPECTED_ROWS}; write-only → many small files)"
+echo "[g10] write path: chunked docker compose cp + sql-client -f (${COMPACT_INSERTS_PER_SESSION} INSERT(s)/session; wait FINISHED each chunk)"
 
-# Verify row count
-ROW_CNT="$(paimon_sql <<SQL
-SELECT COUNT(*) FROM ${TABLE};
-SQL
-)" || fail "COUNT(*) after writes failed"
-ROW_CNT="$(echo "$ROW_CNT" | extract_plain_scalar)" || fail "could not parse row count"
-if [[ "$ROW_CNT" != "$EXPECTED_ROWS" ]]; then
-  fail "expected ${EXPECTED_ROWS} rows after writes, got ${ROW_CNT}"
+next_id=1
+batch_num=0
+while (( batch_num < COMPACT_BATCHES )); do
+  chunk_n=0
+  WRITE_SQL="$(mktemp)"
+  {
+    while (( chunk_n < COMPACT_INSERTS_PER_SESSION && batch_num < COMPACT_BATCHES )); do
+      batch_insert_sql "$next_id" "$COMPACT_ROWS_PER_BATCH"
+      echo
+      next_id=$((next_id + COMPACT_ROWS_PER_BATCH))
+      batch_num=$((batch_num + 1))
+      chunk_n=$((chunk_n + 1))
+    done
+  } >"$WRITE_SQL"
+  echo "[g10] submitting chunk batches $((batch_num - chunk_n + 1))–${batch_num}/${COMPACT_BATCHES} (${chunk_n} INSERT(s), ids up to $((next_id - 1)))"
+  if ! paimon_sql <"$WRITE_SQL" >/dev/null; then
+    rm -f "$WRITE_SQL"
+    fail "chunked INSERT failed at batch≈${batch_num}/${COMPACT_BATCHES}"
+  fi
+  rm -f "$WRITE_SQL"
+  wait_insert_jobs_finished 90
+done
+
+# Verify row count with timeout (eventual visibility after last commit)
+echo "[g10] waiting until COUNT(*)=${EXPECTED_ROWS} (timeout=${COMPACT_ROW_WAIT_TIMEOUT}s)"
+if ! ROW_CNT="$(wait_row_count "$EXPECTED_ROWS" "$COMPACT_ROW_WAIT_TIMEOUT")"; then
+  fail "expected ${EXPECTED_ROWS} rows after writes, got ${ROW_CNT:-0}"
 fi
 echo "[g10] row_count=${ROW_CNT}"
 
@@ -322,7 +406,7 @@ rm -f "$BEFORE_DUMP" "$AFTER_DUMP"
   echo "table=${TABLE}"
   echo "method=CALL sys.compact('ods.ods_compact_demo', '', '', '', 'sink.parallelism=1', '', '', 'full')"
   echo "flink=1.18.1 positional procedure args; paimon=1.4.2; compact_strategy=full; runtime-mode=batch"
-  echo "write_mode=write-only=true during inserts (dedicated compact job)"
+  echo "write_mode=write-only=true; chunked sql-client -f (${COMPACT_INSERTS_PER_SESSION} INSERT/session; scale=${COMPACT_BATCHES}x${COMPACT_ROWS_PER_BATCH})"
   echo "batches=${COMPACT_BATCHES} rows_per_batch=${COMPACT_ROWS_PER_BATCH} row_count=${ROW_CNT}"
   echo "BEFORE snapshot_count=${BEFORE_SNAP} file_count=${BEFORE_FILE_COUNT} total_file_size_bytes=${BEFORE_FILE_SIZE} query_latency_ms=${BEFORE_LATENCY_MS}"
   echo "AFTER  snapshot_count=${AFTER_SNAP} file_count=${AFTER_FILE_COUNT} total_file_size_bytes=${AFTER_FILE_SIZE} query_latency_ms=${AFTER_LATENCY_MS}"

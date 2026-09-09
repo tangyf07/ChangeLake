@@ -178,7 +178,7 @@ bash scripts/reconcile.sh
 
 ### Compaction / G10 (Phase 9)
 
-专用表 `ods.ods_compact_demo`：`write-only=true` 下多批小写入（默认 50×200≈10k 行）→ 记录 Before 统计与指纹 → Flink 1.18 `CALL sys.compact(..., 'full')` → After 统计与指纹。
+专用表 `ods.ods_compact_demo`：`write-only=true` 下**分块**多批小写入（默认 30×100=3k 行，每 session 1 条 INSERT via `sql-client -f`）→ 等待 `COUNT(*)` → 记录 Before 统计与指纹 → Flink 1.18 `CALL sys.compact(..., 'full')` → After 统计与指纹。
 **硬门禁**：查询结果指纹（ordered row dump SHA256）前后一致。**软期望**：`$files` 文件数下降（嘈杂时只记证据，不硬失败）。延迟仅记录，**不**要求百分比下降。
 
 ```bash

@@ -23,7 +23,7 @@ Standalone G10 check: `bash scripts/compaction.sh` / `make compaction`.
 | G7 | `verify_backfill.sh` | Corrupt DWD for `BACKFILL_DT` → backfill ×2 → `fingerprint(run1)==fingerprint(run2)` + reconcile; `[G7] PASS backfill` |
 | G8 | `time_travel.sh` | Dedicated `ods.ods_tt_demo`: S1 amount=100 → S2 amount=200 → S3 DELETE; query each `scan.snapshot-id`; `[G8] PASS time travel` |
 | G9 | `reconcile.sh` | MySQL ↔ ODS counts + `SUM(amount)` (total / by dt / by dt+channel); DECIMAL tol **0.01**; report `metric source lake diff status`; `[G9] PASS reconcile` |
-| G10 | `compaction.sh` | Dedicated `ods.ods_compact_demo`: many small-batch writes → `CALL sys.compact` (full); **fingerprint identical** before/after (hard); file count usually reduced (soft); `[G10] PASS compaction` |
+| G10 | `compaction.sh` | Dedicated `ods.ods_compact_demo`: chunked small-batch writes (default 30×100) → wait `COUNT(*)` → `CALL sys.compact` (full); **fingerprint identical** before/after (hard); file count usually reduced (soft); `[G10] PASS compaction` |
 
 Hard failure → print `FAIL`, write partial evidence if any, `exit 2`. Never WARNING-and-continue.
 
